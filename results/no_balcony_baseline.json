@@ -1,0 +1,34 @@
+{
+  "no_balcony": [
+    {
+      "behavior_idx": 0,
+      "no_suffix_loss": 2.90625,
+      "filler_loss": 2.421875
+    },
+    {
+      "behavior_idx": 1,
+      "no_suffix_loss": 2.515625,
+      "filler_loss": 1.75
+    },
+    {
+      "behavior_idx": 2,
+      "no_suffix_loss": 2.296875,
+      "filler_loss": 1.6484375
+    },
+    {
+      "behavior_idx": 3,
+      "no_suffix_loss": 2.328125,
+      "filler_loss": 1.15625
+    },
+    {
+      "behavior_idx": 4,
+      "no_suffix_loss": 2.65625,
+      "filler_loss": 1.2890625
+    },
+    {
+      "behavior_idx": 5,
+      "no_suffix_loss": 1.9375,
+      "filler_loss": 1.75
+    }
+  ]
+}

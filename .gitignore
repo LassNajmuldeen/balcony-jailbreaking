@@ -1,0 +1,39 @@
+# cloned dependency repos (they have their own git history)
+AdversariaLLM/
+Balcony-LLaMA/
+
+# local notes, not for the repo
+local-notes/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# model weights and large files
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.h5
+
+# environment and secrets
+.env
+*.key
+*.pem
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# logs
+*.log
