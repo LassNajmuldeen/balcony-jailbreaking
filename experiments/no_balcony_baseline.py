@@ -31,8 +31,8 @@ RESULTS_DIR = Path("/path/to/project/results")
 RESULTS_DIR.mkdir(exist_ok=True)
 
 # same hyperparams as phase2 so the comparison is fair
-N_BEHAVIORS = 6
-NUM_STEPS = 100
+N_BEHAVIORS = 50
+NUM_STEPS = 150
 SEARCH_WIDTH = 128
 TOPK = 64
 FILLER_SUFFIX = GCGConfig().optim_str_init

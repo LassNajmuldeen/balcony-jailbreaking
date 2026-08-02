@@ -33,7 +33,7 @@ RESULTS_DIR = Path("/path/to/project/results")
 RESULTS_DIR.mkdir(exist_ok=True)
 
 EXITS = [4, 8, 12, "full"]
-N_BEHAVIORS = 6
+N_BEHAVIORS = 50
 FILLER_SUFFIX = GCGConfig().optim_str_init
 
 

@@ -29,8 +29,8 @@ RESULTS_DIR = Path("/path/to/project/results")
 RESULTS_DIR.mkdir(exist_ok=True)
 
 EXITS = [4, 8, 12, "full"]
-N_BEHAVIORS = 6
-NUM_STEPS = 100
+N_BEHAVIORS = 50
+NUM_STEPS = 150
 SEARCH_WIDTH = 128
 TOPK = 64
 
@@ -175,37 +175,15 @@ def run_transfer_matrix(model, tok, attacks, not_allowed_ids):
     return transfer
 
 
-def summarize(attacks, transfer):
+def summarize_attacks(attacks):
     print("\n\n=== SUMMARY: per-exit attack difficulty ===")
-    print(f"{'exit':>6} | {'mean final loss':>16} | {'refusal rate (own exit)':>24}")
+    print(f"{'exit':>6} | {'mean final loss':>16} | {'refusal rate':>14} | {'non-refusal (approx ASR)':>26}")
     for exit_layer in EXITS:
         behaviors = attacks[str(exit_layer)]
         mean_loss = sum(b["final_loss"] for b in behaviors) / len(behaviors)
         refusal_rate = sum(looks_like_refusal(b["own_exit_completion"] or "") for b in behaviors) / len(behaviors)
-        print(f"{str(exit_layer):>6} | {mean_loss:16.4f} | {refusal_rate:24.2%}")
-
-    print("\n=== SUMMARY: transfer matrix (mean loss, rows=source suffix, cols=eval exit) ===")
-    header = " " * 8 + "".join(f"{str(e):>10}" for e in EXITS)
-    print(header)
-    for source_exit in EXITS:
-        row = f"{str(source_exit):>8}"
-        for target_exit in EXITS:
-            key = f"{source_exit}->{target_exit}"
-            entries = transfer[key]
-            mean_loss = sum(e["loss"] for e in entries) / len(entries)
-            row += f"{mean_loss:10.3f}"
-        print(row)
-
-    print("\n=== SUMMARY: transfer matrix (refusal rate, rows=source suffix, cols=eval exit) ===")
-    print(header)
-    for source_exit in EXITS:
-        row = f"{str(source_exit):>8}"
-        for target_exit in EXITS:
-            key = f"{source_exit}->{target_exit}"
-            entries = transfer[key]
-            refusal_rate = sum(e["refusal"] for e in entries) / len(entries)
-            row += f"{refusal_rate:10.0%}"
-        print(row)
+        approx_asr = 1.0 - refusal_rate
+        print(f"{str(exit_layer):>6} | {mean_loss:16.4f} | {refusal_rate:14.2%} | {approx_asr:25.2%}")
 
 
 def main():
@@ -232,13 +210,7 @@ def main():
         json.dump(attacks, f, indent=2)
     print(f"\nSaved attack results to {RESULTS_DIR / 'phase2_attacks.json'}", flush=True)
 
-    print("\n=== Building transfer matrix ===", flush=True)
-    transfer = run_transfer_matrix(model, tok, attacks, not_allowed_ids)
-    with open(RESULTS_DIR / "phase2_transfer.json", "w") as f:
-        json.dump(transfer, f, indent=2)
-    print(f"Saved transfer results to {RESULTS_DIR / 'phase2_transfer.json'}", flush=True)
-
-    summarize(attacks, transfer)
+    summarize_attacks(attacks)
 
 
 if __name__ == "__main__":

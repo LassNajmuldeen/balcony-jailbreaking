@@ -1,6 +1,7 @@
 # cloned dependency repos (they have their own git history)
 AdversariaLLM/
 Balcony-LLaMA/
+TAO-Attack/
 
 # local notes, not for the repo
 local-notes/
@@ -37,3 +38,9 @@ Thumbs.db
 
 # logs
 *.log
+
+# paper generation (not for repo)
+paper_figures/
+generate_paper_figures.py
+paper_figures.tex
+run_all.sh
