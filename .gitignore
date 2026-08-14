@@ -1,46 +1,94 @@
-# cloned dependency repos (they have their own git history)
-AdversariaLLM/
-Balcony-LLaMA/
-TAO-Attack/
+# ---------------------------------------------------------------------------
+# What this repo tracks: source only -- the adapter and the experiment scripts
+# under experiments/, plus README.md and RESULTS.md.
+#
+# Everything else is derived, machine-local, or a working artefact: results,
+# figures, exports, logs, orchestration shell scripts, notes. All of it
+# regenerates from a run, so it is excluded here rather than committed.
+#
+# The three dependency repos (Balcony-LLaMA, TAO-Attack, AdversariaLLM) are git
+# SUBMODULES pinned by commit -- see .gitmodules.
+# ---------------------------------------------------------------------------
 
-# local notes, not for the repo
-local-notes/
-
-# python
+# ---- python -------------------------------------------------------------
 __pycache__/
 *.pyc
 *.pyo
 .venv/
 *.egg-info/
 
-# model weights and large files
+# ---- model weights and other large binaries ------------------------------
 *.bin
 *.safetensors
 *.pt
 *.pth
 *.ckpt
 *.h5
+*.pkl
 
-# environment and secrets
+# ---- environment and secrets ---------------------------------------------
 .env
 *.key
 *.pem
 
-# OS junk
+# ---- OS and editor junk --------------------------------------------------
 .DS_Store
 Thumbs.db
-
-# editor
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# logs
+# ---- experiment outputs --------------------------------------------------
+# Raw run data and everything rendered from it. The reported numbers live in
+# RESULTS.md; anyone else regenerates these by running the experiments.
+results/
+results_*/
+paper_figures/
+paper_tables/
+*.json
+
+# ...but the model adapter's own config files are source, not output.
+!adapter/**/*.json
+
+# ---- run bookkeeping -----------------------------------------------------
+# Per-shard logs and the .done/.failed/.running/.skipped state markers used for
+# resume. Machine-local by definition.
+run_logs/
+run_state/
 *.log
 
-# paper generation (not for repo)
-paper_figures/
-generate_paper_figures.py
-paper_figures.tex
-run_all.sh
+# ---- orchestration scripts -----------------------------------------------
+# Machine- and run-specific drivers, plus a number of one-off scheduling
+# interventions. Not program code, and not reusable as-is on another machine.
+scripts/
+
+# ---- local working files -------------------------------------------------
+# Notes, setup log, chat templates and the AdversariaLLM patch set: all specific
+# to how this particular machine was brought up.
+local-notes/
+SETUP.md
+patches/
+chat_templates/
+
+# ---- experiment scripts that are not part of the published pipeline -------
+# Kept on disk for provenance, excluded from the repo. Either superseded
+# scaffolding (the phase-1 smoke test, the settled 256-vs-512 length control and
+# its regeneration pass) or asset generators whose outputs already live in
+# RESULTS.md and the paper.
+experiments/smoke_test_gcg.py
+experiments/compare_256_512.py
+experiments/regen_completions.py
+experiments/visualize_results.py
+experiments/export_results.py
+experiments/export_paper_csv.py
+experiments/export_loss_curves.py
+experiments/make_paper_assets.py
+experiments/depth_artifact/
+
+# ---- scratch, backups, superseded archives -------------------------------
+.edit_backups/
+archive_tao_prefix_*/
+*.bak
+*.bak-*
+*.attempt[0-9]

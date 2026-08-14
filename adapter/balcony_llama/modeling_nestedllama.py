@@ -26,7 +26,7 @@ import torch.utils.checkpoint
 from torch import nn
 
 from transformers.activations import ACT2FN
-from transformers.cache_utils import Cache, DynamicCache, StaticCache
+from transformers.cache_utils import Cache, DynamicCache, DynamicLayer, StaticCache
 from transformers.generation import GenerationMixin
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
@@ -234,6 +234,38 @@ def eager_attention_forward(
     return attn_output, attn_weights
 
 
+def grow_cache_for_exit_modules(past_key_value: Cache, layer_idx: int) -> None:
+    """Make room in the KV cache for the Balcony exit modules.
+
+    Exit modules are registered with ``layer_idx = num_hidden_layers + i`` (see
+    ``NestedLlamaModel.__init__``), so for a 32-layer backbone they occupy cache
+    slots 32, 33, 34. But ``generate()`` builds its cache from
+    ``config.num_hidden_layers`` alone, which only covers the backbone. Such a
+    cache is constructed from an explicit ``layers`` list, so its
+    ``layer_class_to_replicate`` is ``None`` and ``Cache.update`` indexes straight
+    into ``layers`` -- raising ``IndexError: list index out of range`` the first
+    time an exit module writes to it. GCG never hit this because it does not call
+    ``generate()``; TAO's negative-prompt step does.
+
+    A cache that was lazily initialised (``layer_class_to_replicate`` set) already
+    appends layers by itself inside ``update``, so we leave those alone.
+    """
+    layers = getattr(past_key_value, "layers", None)
+    if layers is None or len(layers) > layer_idx:
+        return
+    if getattr(past_key_value, "layer_class_to_replicate", None) is not None:
+        return
+
+    n_missing = layer_idx + 1 - len(layers)
+    try:
+        # mirror whatever layer type the backbone is using
+        layers.extend(type(layers[-1])() for _ in range(n_missing))
+    except (TypeError, IndexError):
+        # sliding-window/static layers need constructor args; the exit modules only
+        # ever need plain dynamic growth, so fall back to the dynamic layer type
+        layers.extend(DynamicLayer() for _ in range(n_missing))
+
+
 class NestedLlamaAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -282,6 +314,7 @@ class NestedLlamaAttention(nn.Module):
         if past_key_value is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+            grow_cache_for_exit_modules(past_key_value, self.layer_idx)
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
         attention_interface: Callable = eager_attention_forward

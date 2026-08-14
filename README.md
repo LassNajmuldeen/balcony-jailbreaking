@@ -29,14 +29,14 @@ adapter/
   exit_wrapper.py                       # wraps balcony model to expose one exit at a time
 
 experiments/
-  phase2_per_exit_transfer.py           # main experiment: per-exit GCG attack + transfer matrix (HarmBench)
-  no_balcony_baseline.py                # same GCG attack on the pre-balcony baseline
-  baseline_control.py                   # pre-attack loss measurements (no suffix + filler)
-  judge_completions.py                  # HarmBench judge scoring + ASR% computation
-  transfer_baseline.py                  # extends transfer matrix with the baseline model
-  advbench_per_exit.py                  # GCG attack using AdvBench behaviors
-  tao_attack.py                         # TAO attack on all exits (HarmBench)
-  eval_utility.py                       # lm-eval benchmarks per exit (hellaswag, arc, mmlu, etc.)
+  attack_gcg_harmbench.py           # main experiment: per-exit GCG attack + transfer matrix (HarmBench)
+  attack_gcg_baseline.py                # same GCG attack on the pre-balcony baseline
+  measure_clean_loss.py                   # pre-attack loss measurements (no suffix + filler)
+  judge_harmfulness.py                  # HarmBench judge scoring + ASR% computation
+  transfer_matrix_baseline.py                  # extends transfer matrix with the baseline model
+  attack_gcg_advbench.py                  # GCG attack using AdvBench behaviors
+  attack_tao.py                         # TAO attack on all exits (HarmBench)
+  eval_capabilities.py                       # lm-eval benchmarks per exit (hellaswag, arc, mmlu, etc.)
   visualize_results.py                  # generates all figures from json results
 
 results/                                # raw json data + generated figures
@@ -67,21 +67,21 @@ AdversariaLLM/.venv/bin/python experiments/<script>.py
 
 ```bash
 # GCG attacks (HarmBench, 50 behaviors, 150 steps)
-python experiments/phase2_per_exit_transfer.py    # main attack + transfer matrix
-python experiments/no_balcony_baseline.py          # baseline attack
-python experiments/baseline_control.py             # pre-attack losses
+python experiments/attack_gcg_harmbench.py    # main attack + transfer matrix
+python experiments/attack_gcg_baseline.py          # baseline attack
+python experiments/measure_clean_loss.py             # pre-attack losses
 
 # AdvBench attacks (50 behaviors, 150 steps)
-python experiments/advbench_per_exit.py            # GCG on AdvBench behaviors
+python experiments/attack_gcg_advbench.py            # GCG on AdvBench behaviors
 
 # TAO attack (HarmBench, 50 behaviors, 150 steps)
-python experiments/tao_attack.py                   # TAO on all exits
+python experiments/attack_tao.py                   # TAO on all exits
 
 # judge scoring + ASR
-python experiments/judge_completions.py            # judge scoring with ASR%
+python experiments/judge_harmfulness.py            # judge scoring with ASR%
 
 # utility benchmarks
-python experiments/eval_utility.py                 # hellaswag, arc, mmlu, winogrande, piqa
+python experiments/eval_capabilities.py                 # hellaswag, arc, mmlu, winogrande, piqa
 
 # visualization
 python experiments/visualize_results.py            # regenerate all figures

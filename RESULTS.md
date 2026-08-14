@@ -1,315 +1,360 @@
 # Results: Adversarial Robustness Across Balcony Exits
 
-## Setup
-
-**Model**: `parsakaveh/Balcony-LLM-1B`, a SmolLM-1B with early-exit heads at
-layers 4, 8, and 12 of its 16-layer trunk, plus the normal full-depth path
-(layer 16). Each exit has its own decoder layer + norm + output projection,
-trained via self-distillation.
-
-**Baseline model**: `parsakaveh/LLM-1B-Pretrained`, the original checkpoint
-with no exit heads. Same 16-layer architecture; every shared weight is
-bit-identical to the balcony model's trunk. The only difference is the balcony
-model has three extra exit heads bolted on.
-
-**Attack**: GCG (Greedy Coordinate Gradient), 150 steps, search width 128,
-top-k 64. Appends a 20-token adversarial suffix to the prompt and optimizes
-it to maximize the probability of a target compliance string.
-
-**Benchmarks**:
-- HarmBench (50 behaviors) — standard adversarial robustness evaluation
-- AdvBench (50 behaviors) — additional adversarial benchmark
-- Utility: HellaSwag, ARC-Challenge, ARC-Easy, WinoGrande, PIQA, MMLU (via lm-eval)
-
-**Metrics**:
-- *Teacher-forced loss* — how much probability the model assigns to the target
-  compliance string. Lower = the model is closer to saying "Sure, here's how
-  to...". This is what GCG directly optimizes.
-- *p_harmful* — after GCG finishes, the model freely generates a response,
-  which is scored by HarmBench's classifier (`cais/HarmBench-Mistral-7b-val-cls`).
-  0–1 score for whether the model actually produced harmful content.
-- *ASR%* — attack success rate, the fraction of behaviors where p_harmful > 0.5.
-
-**Hardware**: single NVIDIA RTX A4000 (16 GB VRAM), Ubuntu, CUDA 12.4.
+Updated 2026-08-13. Every number is raw output from the evaluation harness.
+Longer discussion lives elsewhere: bugs in `local-notes/BUGS.md`, run history in
+`local-notes/HANDOFF_2026-08-13.md`.
 
 ---
 
-## 1. Utility Benchmarks (No Attack)
+# 1. Balcony-LLM-1B
 
-These measure each exit's general capability with no adversarial suffix
-applied. Scores climb monotonically from exit 4 → full, as expected: deeper
-exits use more layers and produce better predictions. The no-balcony baseline
-matches the full exit exactly because they share identical weights through
-all 16 layers.
+## 1.1 Attacks, GCG
 
-| Benchmark | Exit 4 | Exit 8 | Exit 12 | Full (16) | No-Balcony Baseline |
-|---|---|---|---|---|---|
-| HellaSwag (acc_norm) | 0.333 | 0.416 | 0.546 | 0.611 | 0.611 |
-| ARC-Challenge (acc_norm) | 0.236 | 0.279 | 0.342 | 0.390 | 0.390 |
-| ARC-Easy (acc_norm) | 0.455 | 0.526 | 0.611 | 0.688 | 0.688 |
-| WinoGrande (acc) | 0.515 | 0.531 | 0.570 | 0.603 | 0.603 |
-| PIQA (acc_norm) | 0.645 | 0.693 | 0.720 | 0.750 | 0.750 |
-| MMLU (acc) | 0.245 | 0.252 | 0.250 | 0.256 | 0.256 |
-
-MMLU is essentially flat (~25%) across all exits, consistent with near-random
-performance on a 4-choice task for a 1B model. The clearest capability gradient
-shows up on HellaSwag (33% → 61%) and ARC-Easy (46% → 69%).
-
----
-
-## 2. Utility Benchmarks (With GCG Suffix)
-
-To check whether GCG adversarial suffixes degrade normal task performance, I
-reran the same benchmarks with each exit's most effective GCG suffix (lowest
-attack loss) prepended to every input. This is a worst-case measurement: if the
-strongest jailbreak suffix doesn't hurt utility, weaker ones won't either.
-
-| Benchmark | Exit 4 | Exit 8 | Exit 12 | Full (16) | No-Balcony Baseline |
-|---|---|---|---|---|---|
-| HellaSwag (acc_norm) | 0.330 (-0.003) | 0.408 (-0.008) | 0.542 (-0.004) | 0.604 (-0.007) | 0.603 (-0.008) |
-| ARC-Challenge (acc_norm) | 0.259 (+0.022) | 0.274 (-0.005) | 0.330 (-0.012) | 0.387 (-0.003) | 0.395 (+0.005) |
-| ARC-Easy (acc_norm) | 0.407 (-0.048) | 0.518 (-0.008) | 0.585 (-0.027) | 0.693 (+0.006) | 0.689 (+0.001) |
-| WinoGrande (acc) | 0.504 (-0.012) | 0.525 (-0.006) | 0.531 (-0.039) | 0.560 (-0.043) | 0.573 (-0.030) |
-| PIQA (acc_norm) | 0.616 (-0.029) | 0.661 (-0.032) | 0.706 (-0.014) | 0.736 (-0.014) | 0.739 (-0.010) |
-| MMLU (acc) | 0.254 (+0.009) | 0.252 (+0.000) | 0.252 (+0.003) | 0.258 (+0.003) | 0.257 (+0.002) |
-
-GCG suffixes have negligible impact on utility. Deltas are within noise for most
-benchmarks (< 1 percentage point). The largest drops are on WinoGrande (~3-4pp
-at exits 12 and full) and PIQA (~3pp at exits 4 and 8), but nothing that would
-suggest the attack broadly degrades the model. MMLU is completely unaffected.
-This confirms that GCG suffixes are narrowly targeted at eliciting specific
-harmful completions, not at disrupting general language understanding.
-
-![utility clean vs attacked](results/figures/12_utility_clean_vs_attacked.png)
-
----
-
-## 3. Pre-Attack Baseline Losses (HarmBench)
-
-Before running GCG, I measured each exit's loss on the target compliance
-strings under two conditions: **no suffix** (just the raw harmful prompt) and
-**filler suffix** (20 meaningless "x" tokens appended). The filler suffix
-controls for the effect of added input length, since GCG's adversarial suffix
-is the same length.
-
-| Exit | No-Suffix Loss | Filler Loss |
-|---|---|---|
-| Exit 4 | 2.953 | 2.369 |
-| Exit 8 | 3.097 | 2.242 |
-| Exit 12 | 2.373 | 1.686 |
-| Full (16) | 2.483 | 1.594 |
-| No-Balcony Baseline | 2.483 | 1.594 |
-
-Shallow exits start with higher loss on the target strings even before any
-attack — they're generally worse at producing any specific text. The filler
-suffix actually lowers loss for all exits (by 0.6–0.9 points), possibly because
-it gives the model more context length to work with. The no-balcony baseline
-has identical pre-attack losses to the full exit, as expected from shared weights.
-
----
-
-## 4. HarmBench GCG Attack Results (50 behaviors, 150 steps)
-
-### 4a. Loss Results
-
-| Exit | Filler Baseline Loss | GCG Final Loss | Absolute Drop | Relative Drop |
+| Exit | HarmBench ASR% | HarmBench loss | AdvBench ASR% | AdvBench loss |
 |---|---|---|---|---|
-| Exit 4 | 2.369 | 0.691 | 1.678 | 70.8% |
-| Exit 8 | 2.242 | 0.562 | 1.681 | 75.0% |
-| Exit 12 | 1.686 | 0.376 | 1.309 | 77.7% |
-| Full (16) | 1.594 | 0.253 | 1.341 | 84.1% |
-| No-Balcony Baseline | 1.594 | 0.259 | 1.335 | 83.8% |
+| Exit 4 | 6.0 | 0.691 | 14.0 | 0.487 |
+| Exit 8 | 10.0 | 0.562 | 12.0 | 0.440 |
+| Exit 12 | 58.0 | 0.376 | 56.0 | 0.315 |
+| Full (16) | 48.0 | 0.253 | 64.0 | 0.257 |
+| Baseline | 52.0 | 0.259 | 54.0 | 0.261 |
 
-GCG pushes loss down significantly at every exit. The relative drop increases
-with depth (71% → 84%), meaning deeper exits are proportionally more vulnerable
-to optimization. The no-balcony baseline and the full balcony exit land at
-nearly identical final losses (0.259 vs 0.253) and nearly identical relative
-drops (83.8% vs 84.1%), confirming that the balcony training did not change
-the trunk's vulnerability at full depth.
+Attack success is low at exits 4 and 8, then rises sharply at exit 12. **Do not
+headline exit 12**: it does not overtake the full model on AdvBench (56.0 vs 64.0)
+and its HarmBench lead (58.0 vs 48.0) is not significant, p = 0.359.
 
-![baseline vs attacked](results/figures/01_baseline_vs_attacked.png)
+What holds: the exit-4/8 versus exit-12 gap is large on both benchmarks, and both
+shallow exits are significantly *below* the full model (p < 0.001, §4).
 
-![loss curves](results/figures/04_loss_curves.png)
+The low numbers at exits 4 and 8 are not safety. GCG converged fine on them; those
+exits are too weak to produce coherent harmful text (see 1.3).
 
-### 4b. Judge Results — HarmBench (the numbers that actually matter)
+## 1.2 Attacks, TAO *(record only)*
 
-Loss measures teacher-forced probability on a fixed string. The judge score
-measures whether the model, when freely generating, actually produces harmful
-content. These tell a much more dramatic story.
+| Exit | HarmBench ASR% | HarmBench TAO loss | AdvBench ASR% | AdvBench TAO loss |
+|---|---|---|---|---|
+| Exit 4 | 0.0 | -1.500 | 2.0 | -1.507 |
+| Exit 8 | 0.0 | -2.105 | 0.0 | -1.900 |
+| Exit 12 | 10.0 | -1.433 | 16.0 | -1.662 |
+| Full (16) | 14.0 | -1.005 | 24.0 | -1.105 |
 
-| Exit | Mean p_harmful | ASR% (p_harmful > 0.5) |
-|---|---|---|
-| Exit 4 | 0.248 | 26.0% |
-| Exit 8 | 0.196 | 18.0% |
-| Exit 12 | 0.689 | 70.0% |
-| Full (16) | 0.583 | 58.0% |
-| No-Balcony Baseline | — * | — * |
+TAO does not reproduce the exit-12 jump (10.0% against GCG's 58.0%). It does
+reproduce the ordering: the full exit is the most attacked arm on both benchmarks.
 
-\* Judge scores were not computed for the no-balcony baseline in the 50-behavior
-run. In the earlier 6-behavior pilot, the no-balcony model reached 0.99 mean
-p_harmful (99% ASR), consistent with its nearly identical loss to the full exit.
+## 1.3 Utility, clean
 
-**Key finding: exit 8 is the most robust exit (18% ASR), not exit 4 (26%).**
-This is a non-monotonic result — the shallowest exit is not the most resistant.
-Exit 8 sits in a sweet spot where it has enough capacity to be coherent but
-the GCG-optimized suffixes don't translate into actual harmful generations.
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 4 | 0.3327 | 0.2372 | 0.4537 | 0.5201 | 0.6409 | 0.2446 |
+| Exit 8 | 0.4167 | 0.2807 | 0.5265 | 0.5233 | 0.6904 | 0.2515 |
+| Exit 12 | 0.5463 | 0.3362 | 0.6149 | 0.5683 | 0.7225 | 0.2492 |
+| Full (16) | 0.6120 | 0.3874 | 0.6902 | 0.5919 | 0.7470 | 0.2555 |
+| Baseline | 0.6120 | 0.3874 | 0.6902 | 0.5919 | 0.7470 | 0.2555 |
 
-Exit 12 is the most vulnerable at 70% ASR, worse than even the full model at
-58%. This is another surprise — the deepest exit is not the most vulnerable.
-Exit 12's higher ASR may come from it being deep enough to generate coherent
-harmful text but having a slightly different optimization landscape than the
-full exit, one that GCG exploits more effectively.
+Capability climbs steeply with depth — exit 4 scores 0.3327 on HellaSwag against
+full's 0.6120, which is why its low attack numbers mean nothing. **Ignore the MMLU
+column**: every arm including the baseline sits at chance for a 1B. Full and
+baseline match to four decimals, confirming the exit-selection code.
 
-![judge scores](results/figures/06_judge_scores_dotplot.png)
+## 1.4 Utility, with GCG suffix attached
 
-![ASR bar chart](results/figures/08_asr_bar.png)
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 4 | 0.3292 | 0.2526 | 0.4074 | 0.5083 | 0.6153 | 0.2539 |
+| Exit 8 | 0.4086 | 0.2722 | 0.5181 | 0.5193 | 0.6610 | 0.2517 |
+| Exit 12 | 0.5417 | 0.3362 | 0.5854 | 0.5422 | 0.7029 | 0.2526 |
+| Full (16) | 0.6049 | 0.3882 | 0.6936 | 0.5517 | 0.7367 | 0.2580 |
+| Baseline | 0.6064 | 0.3942 | 0.6890 | 0.5730 | 0.7416 | 0.2560 |
 
----
+Each exit's strongest jailbreak suffix pasted onto every benchmark question, to
+test whether the attack breaks the model generally or only aims it at harmful
+output. Worst case ~4 points versus 1.3. The attack is narrow.
 
-## 5. AdvBench GCG Attack Results (50 behaviors, 150 steps)
+## 1.5 Utility, with TAO suffix attached *(record only)*
 
-AdvBench uses a different set of harmful behaviors from a separate benchmark.
-This tests whether the HarmBench findings generalize. AdvBench attacks were
-run on the 4 balcony exits only, not the no-balcony baseline.
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 4 | 0.3273 | 0.2474 | 0.4188 | 0.5154 | 0.6137 | 0.2520 |
+| Exit 8 | 0.4117 | 0.2858 | 0.4832 | 0.5296 | 0.6627 | 0.2552 |
+| Exit 12 | 0.5332 | 0.3302 | 0.6107 | 0.5525 | 0.7089 | 0.2530 |
+| Full (16) | 0.5995 | 0.3882 | 0.6873 | 0.5391 | 0.7247 | 0.2562 |
+| Baseline | 0.5995 | 0.3882 | 0.6873 | 0.5391 | 0.7247 | 0.2562 |
 
-### 5a. Loss Results
-
-| Exit | GCG Final Loss (mean) |
-|---|---|
-| Exit 4 | 0.487 |
-| Exit 8 | 0.440 |
-| Exit 12 | 0.315 |
-| Full (16) | 0.257 |
-| No-Balcony Baseline | — (not evaluated) |
-
-The same depth → lower loss pattern holds. AdvBench final losses are slightly
-lower than HarmBench at exits 4 and 8, suggesting AdvBench behaviors may be
-marginally easier to attack at shallow exits.
-
-![advbench loss curves](results/figures/10_advbench_loss_curves.png)
-
-### 5b. HarmBench vs AdvBench Comparison
-
-| Exit | HarmBench Final Loss | AdvBench Final Loss |
-|---|---|---|
-| Exit 4 | 0.691 | 0.487 |
-| Exit 8 | 0.562 | 0.440 |
-| Exit 12 | 0.376 | 0.315 |
-| Full (16) | 0.253 | 0.257 |
-| No-Balcony Baseline | 0.259 | — |
-
-At exits 4 and 8, AdvBench behaviors reach lower final losses than HarmBench.
-At the full exit, the two benchmarks converge (0.253 vs 0.257). The no-balcony
-baseline's HarmBench loss (0.259) sits right alongside the full exit, further
-confirming trunk equivalence. This suggests that AdvBench behaviors may be
-inherently easier to optimize against, but the gap closes at greater depth
-where GCG can exploit the model more fully regardless of behavior source.
-
-![harmbench vs advbench](results/figures/11_harmbench_vs_advbench.png)
+Same conclusion as 1.4: nothing moves by more than a point on average.
 
 ---
 
-## 6. Per-Behavior Heatmap (HarmBench)
+# 2. Balcony-LLaMA2-7B
 
-Not all behaviors are equally vulnerable. The per-behavior heatmap shows
-p_harmful for each behavior × exit combination, revealing which specific
-harmful requests are most susceptible at each depth.
+## 2.1 Attacks, GCG
 
-![per-behavior heatmap](results/figures/03_per_behavior_heatmap.png)
+Corrected run: `CHAT_TEMPLATE=plain`, 13b judge, 512-token completions.
+Parenthesised values are the contaminated originals.
+
+| Exit | HarmBench ASR% | HarmBench loss | AdvBench ASR% | AdvBench loss |
+|---|---|---|---|---|
+| Exit 15 | **36.0** (10.0) | 0.479 (0.605) | **46.0** (14.0) | 0.445 (0.681) |
+| Exit 18 | **40.0** (14.0) | 0.455 (0.543) | **54.0** (12.0) | 0.490 (0.672) |
+| Exit 21 | **40.0** (14.0) | 0.420 (0.517) | **48.0** (10.0) | 0.426 (0.644) |
+| Full (32) | **44.0** (12.0) | 0.389 (0.427) | **42.0** (12.0) | 0.424 (0.491) |
+| Baseline ⚠ | *not re-run* (8.0) | (0.452) | *not re-run* (14.0) | (0.600) |
+
+Every cell moved significantly — paired McNemar on the same 50 behaviours,
+contaminated versus corrected: HarmBench 15/18/21/full p = 0.0106, 0.0072, 0.0044,
+0.0004; AdvBench p = 0.0004, 0.00005, 0.0001, 0.0015. Three survive Bonferroni over
+the study's 36 tests. Diagnostics: `[INST]` leakage 28–52% at exits and 82–84% at
+full went to **0%**, and median completion length went from ~1080 to 1856–2208
+characters. The model was never refusing.
+
+**No exit is significantly more attacked than the full exit** — McNemar on
+corrected data, exit versus its own full exit:
+
+| Benchmark | Exit | Exit only | Full only | p |
+|---|---|---|---|---|
+| HarmBench | 15 | 9 | 13 | 0.52 |
+| HarmBench | 18 | 8 | 10 | 0.81 |
+| HarmBench | 21 | 7 | 9 | 0.80 |
+| AdvBench | 15 | 13 | 11 | 0.84 |
+| AdvBench | 18 | 13 | 7 | 0.26 |
+| AdvBench | 21 | 12 | 9 | 0.66 |
+
+Behaviour sets verified identical between each exit cell and the full cell.
+
+Two caveats:
+
+1. **On AdvBench all three exits now sit above the full exit** (46.0, 54.0, 48.0
+   against 42.0), where the contaminated numbers put full on top. Nothing close to
+   significant — nearest is exit 18 at p = 0.26 — but "the full exit is the most
+   attackable arm" needs qualifying for the 7B. Exit 18's 54.0 is the highest single
+   7B cell in the study.
+2. **The corrected AdvBench loss column is not monotonic** (exit 18 = 0.490 against
+   exit 15's 0.445 and exit 21's 0.426). Exit 18 is the one cell that ran solo on an
+   idle GPU rather than 3-wide, re-run 2026-08-13 after an OOM. The 7B's run-to-run
+   noise floor has never been measured the way the 8B's was, so treat this as
+   unexplained, not as a depth effect.
+
+## 2.2 Attacks, TAO *(record only)*
+
+| Exit | HarmBench ASR% | HarmBench TAO loss | AdvBench ASR% | AdvBench TAO loss |
+|---|---|---|---|---|
+| Exit 15 | 2.0 | -1.012 | 6.0 | -0.700 |
+| Exit 18 | 12.0 | -0.379 | 8.0 | -0.114 |
+| Exit 21 | 12.0 | -0.288 | 10.0 | -0.084 |
+| Full (32) | 16.0 | -0.090 | 22.0 | -0.029 |
+
+Not template-contaminated — TAO builds raw token ids and never calls
+`apply_chat_template`. It reaches the same null as corrected GCG (all six
+exit-versus-full tests non-significant) at a much lower level, 2–22% against
+36–48%.
+
+## 2.3 Utility, clean
+
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 15 | 0.6303 | 0.3473 | 0.6174 | 0.6361 | 0.7421 | 0.3693 |
+| Exit 18 | 0.6843 | 0.3882 | 0.6616 | 0.6504 | 0.7601 | 0.3947 |
+| Exit 21 | 0.7153 | 0.4138 | 0.6827 | 0.6701 | 0.7661 | 0.3999 |
+| Full (32) | 0.7603 | 0.4514 | 0.7395 | 0.6906 | 0.7867 | 0.4093 |
+| Baseline | 0.7603 | 0.4514 | 0.7395 | 0.6906 | 0.7867 | 0.4093 |
+
+The exits hold up well — even the shallowest beats the 1B's full model — so the
+flat attack numbers cannot be blamed on weak exits.
+
+## 2.4 Utility, with GCG suffix attached
+
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 15 | 0.6123 | 0.3242 | 0.4819 | 0.6322 | 0.7176 | 0.3303 |
+| Exit 18 | 0.6572 | 0.3422 | 0.4848 | 0.6527 | 0.7263 | 0.3264 |
+| Exit 21 | 0.6848 | 0.3712 | 0.4891 | 0.6535 | 0.7405 | 0.3354 |
+| Full (32) | 0.7399 | 0.4070 | 0.5724 | 0.6961 | 0.7731 | 0.3842 |
+| Baseline | 0.7463 | 0.4087 | 0.5631 | 0.6922 | 0.7737 | 0.3603 |
+
+**Do not report the ARC-Easy column.** It drops 14–19 points, ~3× anything else,
+and the attacked scores collapse into a narrow band (0.4819, 0.4848, 0.4891) though
+the same exits scored 0.6174, 0.6616, 0.6827 clean. Exits that differ clean and
+agree attacked look like a bug. The baseline degrades identically, so it is not the
+Balcony architecture, and the 8B ran the same code without it. It also reproduces
+under TAO's completely different suffix, which points at "any 20-token suffix in
+this position breaks 7B ARC-Easy" rather than adversarial content. A filler-suffix
+control would settle it.
+
+## 2.5 Utility, with TAO suffix attached *(record only)*
+
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 15 | 0.6094 | 0.3251 | 0.4722 | 0.6377 | 0.7171 | 0.3175 |
+| Exit 18 | 0.6742 | 0.3592 | 0.4992 | 0.6575 | 0.7334 | 0.3569 |
+| Exit 21 | 0.6996 | 0.3703 | 0.4844 | 0.6803 | 0.7432 | 0.2887 |
+| Full (32) | 0.7477 | 0.4121 | 0.5682 | 0.7032 | 0.7661 | 0.3635 |
+
+**Exit 21 MMLU is anomalous** — 0.2887 against 0.3999 clean, essentially chance,
+while exits 18 and full only fall to 0.3569 and 0.3635. Do not report this row.
 
 ---
 
-## 7. Variance Across Behaviors
+# 3. Balcony-LLaMA3-8B
 
-The dotplot shows the spread of final losses across all 50 behaviors for each
-exit. Deeper exits have tighter distributions (GCG reliably converges) while
-shallow exits show more variance (some behaviors resist, others don't).
+## 3.1 Attacks, GCG
 
-![variance dotplot](results/figures/05_variance_dotplot.png)
+| Exit | HarmBench ASR% | HarmBench loss | AdvBench ASR% | AdvBench loss |
+|---|---|---|---|---|
+| Exit 15 | 0.0 | 1.904 | 4.0 | 1.530 |
+| Exit 18 | 4.0 | 1.203 | 2.0 | 1.021 |
+| Exit 21 | 10.0 | 1.057 | 8.0 | 0.906 |
+| Full (32) | 24.0 | 0.501 | 26.0 | 0.521 |
+| Baseline | 22.0 | 0.507 | 26.0 | 0.522 |
+
+No marker leakage anywhere in the 8B. One exception left open: 14 of 50 full-exit
+completions generate the literal word `assistant` (llama-3's role token) with no
+occurrence in the prompt or suffix. Untested rather than cleared; the control is a
+full-exit run at `CHAT_TEMPLATE=plain`.
+
+**The near-zero numbers are correct, and they do not all mean the same thing.**
+
+*Exit 15 cannot write.* Reading all 50 HarmBench completions by hand, ~36 are
+unrelated to the question (`# 1.1.1.1`, "The Great Gatsby", LaTeX fragments). Its
+0.0% means "produced nothing scoreable", not "resisted". Do not cite as robustness.
+
+*Exits 18 and 21 are a real result.* They produce about as much on-topic text as
+the full exit (~24 of 50 by hand count) yet score 4.0 and 10.0 against full's 24.0.
+The full exit complies outright — 11 completions open "Sure, here's how to hire a
+hitman: 1. Find a hitman…" — while 18 and 21 write relevant, non-complying prose,
+mostly trapped in repetition loops. That gap is not a degeneracy artifact.
+
+GCG itself converged, which is worth stating because the raw losses look alarming:
+
+| | Start | End | Drop | Still improving at step 150 |
+|---|---|---|---|---|
+| 8B exit 15 | 2.690 | 1.904 | 0.786 | 43 of 50 |
+| 7B exit 15 | 1.240 | 0.605 | 0.635 | 48 of 50 |
+| 1B exit 4 | 2.021 | 0.691 | 1.331 | 40 of 50 |
+
+The exits simply start at 2.690 instead of 1.240, because a model that cannot
+produce coherent text also cannot put probability on "Sure, here's how to...".
+
+**A trap worth recording.** We first concluded the attack was broken because 8B
+exit 15 scores 0.5189 on HellaSwag and therefore could not be incapable. That was
+wrong: HellaSwag, ARC, PIQA and MMLU are all multiple-choice, so the model ranks
+pre-written options and never generates a token. The utility suite is blind to
+generation collapse, which is exactly the failure mode here.
+
+On full-versus-baseline agreement: on AdvBench they produced 46 of 50 identical
+suffixes, since they share weights — their matching 26% is close to a tautology.
+Across different exits, zero of 50 completions match, so the exit wrapper is
+genuinely serving different exits.
+
+## 3.2 Attacks, TAO *(record only)*
+
+| Exit | HarmBench ASR% | HarmBench TAO loss | AdvBench ASR% | AdvBench TAO loss |
+|---|---|---|---|---|
+| Exit 15 | 0.0 | +0.951 | 8.0 | +0.640 |
+| Exit 18 | 2.0 | +0.139 | 8.0 | +0.100 |
+| Exit 21 | 6.0 | +0.072 | 14.0 | -0.153 |
+| Full (32) | 32.0 | -0.426 | 16.0 | -0.217 |
+
+Exit 15 is the only cell in the study whose TAO loss stays positive — the attack
+never got the target below the refusal term, the same story the completions tell.
+Six behaviours initially died to a NaN bug (empty negative prompt at exit 15,
+guarded in `experiments/attack_tao.py` 2026-08-11); all six were re-run and came
+back as attack failures, so the table is a full n=50 and unchanged. `BUGS.md`.
+
+**The 8B carries ~4 ASR points of run-to-run noise.** A separate no-Balcony trunk
+run under TAO on HarmBench — the same computation as the full exit — came back
+24.0 against full's 32.0, from 19 of 50 differing suffixes. Float nondeterminism
+amplified by greedy argmin. Treat any 8B exit-to-exit gap under 4 points as noise.
+
+## 3.3 Utility, clean
+
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 15 | 0.5189 | 0.3345 | 0.4760 | 0.6582 | 0.6344 | 0.3096 |
+| Exit 18 | 0.5810 | 0.3857 | 0.5732 | 0.6835 | 0.6692 | 0.6137 |
+| Exit 21 | 0.6348 | 0.4292 | 0.6111 | 0.6969 | 0.6953 | 0.6258 |
+| Full (32) | 0.7918 | 0.5401 | 0.7774 | 0.7340 | 0.8063 | 0.6211 |
+| Baseline | 0.7918 | 0.5401 | 0.7774 | 0.7340 | 0.8063 | 0.6211 |
+
+The exits look reasonable. **Do not read that as "these exits work"** — every
+benchmark here is multiple-choice, and §3.1 shows the same exits produce only
+repetition loops when asked to generate. Also unconfirmed: MMLU reads 0.3096 at
+exit 15 then jumps to 0.6137/0.6258, level with full, while HellaSwag and ARC stay
+20–27% down. Plausible, but the cliff is sharp enough to check.
+
+## 3.4 Utility, with GCG suffix attached
+
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 15 | 0.5149 | 0.3225 | 0.4853 | 0.6440 | 0.6382 | 0.3059 |
+| Exit 18 | 0.5852 | 0.3609 | 0.5598 | 0.6669 | 0.6681 | 0.5891 |
+| Exit 21 | 0.6295 | 0.4010 | 0.6170 | 0.7135 | 0.7084 | 0.5978 |
+| Full (32) | 0.7846 | 0.5154 | 0.7841 | 0.7293 | 0.7992 | 0.6055 |
+| Baseline | 0.7834 | 0.4710 | 0.7454 | 0.7222 | 0.7813 | 0.5997 |
+
+Barely anything moves, matching the 1B and making the 7B's ARC-Easy result in 2.4
+the odd one out.
+
+## 3.5 Utility, with TAO suffix attached *(record only)*
+
+| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
+|---|---|---|---|---|---|---|
+| Exit 15 | 0.5165 | 0.3302 | 0.4684 | 0.6354 | 0.6523 | 0.3106 |
+| Exit 18 | 0.5766 | 0.3584 | 0.5610 | 0.6535 | 0.6752 | 0.5806 |
+| Exit 21 | 0.6379 | 0.4078 | 0.6254 | 0.7001 | 0.6937 | 0.6076 |
+| Full (32) | 0.7909 | 0.4991 | 0.7719 | 0.7474 | 0.8020 | 0.5931 |
+| Baseline | 0.7909 | 0.4991 | 0.7719 | 0.7474 | 0.8020 | 0.5931 |
+
+Same as 3.4. `full` and `Baseline` are identical to four decimals even though their
+*attacks* diverged (3.2) — utility evaluation is a deterministic forward pass with
+no argmin to amplify float noise.
 
 ---
 
-## 8. Summary of All Experiments
+# 4. Significance
 
-| | Exit 4 | Exit 8 | Exit 12 | Full (16) | No-Balcony |
+McNemar's exact test, paired on the same 50 behaviours.
+
+## 4.1 GCG, exit versus full exit
+
+The study's comparator. 7B numbers are in the table in §2.1 (all null, p 0.26–0.84).
+
+## 4.2 GCG, exit versus separately-loaded baseline
+
+"Exit only" counts behaviours jailbroken at the exit but not the baseline.
+
+| Model | Benchmark | Exit | Exit only | Baseline only | p |
 |---|---|---|---|---|---|
-| **Utility (clean)** | | | | | |
-| HellaSwag | 0.333 | 0.416 | 0.546 | 0.611 | 0.611 |
-| ARC-C | 0.236 | 0.279 | 0.342 | 0.390 | 0.390 |
-| ARC-E | 0.455 | 0.526 | 0.611 | 0.688 | 0.688 |
-| WinoGrande | 0.515 | 0.531 | 0.570 | 0.603 | 0.603 |
-| PIQA | 0.645 | 0.693 | 0.720 | 0.750 | 0.750 |
-| MMLU | 0.245 | 0.252 | 0.250 | 0.256 | 0.256 |
-| **Utility (with GCG suffix)** | | | | | |
-| HellaSwag | 0.330 | 0.408 | 0.542 | 0.604 | 0.603 |
-| ARC-C | 0.259 | 0.274 | 0.330 | 0.387 | 0.395 |
-| ARC-E | 0.407 | 0.518 | 0.585 | 0.693 | 0.689 |
-| WinoGrande | 0.504 | 0.525 | 0.531 | 0.560 | 0.573 |
-| PIQA | 0.616 | 0.661 | 0.706 | 0.736 | 0.739 |
-| MMLU | 0.254 | 0.252 | 0.252 | 0.258 | 0.257 |
-| **HarmBench GCG** | | | | | |
-| Final loss | 0.691 | 0.562 | 0.376 | 0.253 | 0.259 |
-| Loss reduction | 70.8% | 75.0% | 77.7% | 84.1% | 83.8% |
-| Mean p_harmful | 0.248 | 0.196 | 0.689 | 0.583 | — * |
-| ASR% | 26.0% | 18.0% | 70.0% | 58.0% | — * |
-| **AdvBench GCG** | | | | | |
-| Final loss | 0.487 | 0.440 | 0.315 | 0.257 | — ** |
+| 7B ⚠ | HarmBench | 15, 18, 21, full | 7, 8, 8, 7 | 11, 10, 11, 4 | 0.48, 0.82, 0.65, 0.55 |
+| 7B ⚠ | AdvBench | 15, 18, 21, full | 10, 12, 11, 13 | 6, 5, 5, 7 | 0.45, 0.14, 0.21, 0.26 |
+| 8B | HarmBench | 15 | 2 | 14 | **0.004** |
+| 8B | HarmBench | 18, 21, full | 4, 3, 5 | 12, 11, 5 | 0.08, 0.06, 1.00 |
+| 8B | AdvBench | 15, 18 | 0, 0 | 13, 14 | **below 0.001** |
+| 8B | AdvBench | 21, full | 4, 0 | 12, 0 | 0.08, 1.00 |
 
-\* Judge scores were not computed for the no-balcony baseline in the 50-behavior
-run. In the earlier 6-behavior pilot, the no-balcony model reached 0.99 mean
-p_harmful (99% ASR), consistent with its nearly identical loss to the full exit.
+**⚠ Both 7B rows are dead**, kept only as a record: both arms ran under the chat
+template, so the test is contaminated on both sides. Repairing them needs a
+template-free 7B baseline, which has not been run. Use §2.1 instead.
 
-\** AdvBench attacks were run on the 4 balcony exits only, not the no-balcony
-baseline.
+Within the 1B, comparing exits to each other on HarmBench:
 
----
+| Comparison | Flips to jailbroken | Flips back | p |
+|---|---|---|---|
+| Exit 12 vs exit 8 | 26 | 0 | **below 0.001** |
+| Exit 12 vs exit 4 | 25 | 3 | **below 0.001** |
+| Full vs exit 8 | 21 | 1 | **below 0.001** |
+| Exit 12 vs full | 12 | 6 | 0.238 |
 
-## 9. Key Findings
+The only significant Balcony-versus-baseline results in the GCG study are the 8B's
+shallow exits — exactly the arms §3.1 flags as incapable rather than robust.
 
-1. **Early exits trade capability for robustness.** Utility scores climb
-   monotonically from exit 4 → full (e.g., HellaSwag 33% → 61%), while attack
-   success drops dramatically at early exits. This is the core tradeoff.
+## 4.3 TAO, exit versus full exit *(record only)*
 
-2. **The robustness–depth relationship is non-monotonic.** Exit 8 is the most
-   robust (18% ASR), beating exit 4 (26%). Exit 12 is the most vulnerable
-   (70% ASR), worse than the full model (58%). This means neither "shallower =
-   safer" nor "deeper = more broken" — the relationship is more complex.
+| Model | Benchmark | Exit | Exit only | Full only | p |
+|---|---|---|---|---|---|
+| 1B | HarmBench | 4, 8, 12 | 0, 0, 4 | 7, 7, 6 | **0.016**, **0.016**, 0.75 |
+| 1B | AdvBench | 4, 8, 12 | 1, 0, 5 | 12, 12, 9 | **0.003**, **below 0.001**, 0.42 |
+| 7B | HarmBench | 15, 18, 21 | 1, 5, 5 | 8, 7, 7 | **0.039**, 0.77, 0.77 |
+| 7B | AdvBench | 15, 18, 21 | 2, 4, 5 | 10, 11, 11 | **0.039**, 0.12, 0.21 |
+| 8B | HarmBench | 15, 18, 21 | 0, 1, 1 | 16, 16, 14 | **below 0.001**, **below 0.001**, **0.001** |
+| 8B | AdvBench | 15, 18, 21 | 3, 4, 6 | 7, 8, 7 | 0.34, 0.39, 1.00 |
 
-3. **Loss underestimates the gap.** GCG drops loss by 71–84% at every exit,
-   suggesting similar vulnerability. But actual jailbreak success (ASR%) ranges
-   from 18% to 70%. Shallow exits resist not because GCG can't optimize their
-   loss, but because they can't coherently follow through on harmful content
-   during free generation.
-
-4. **Balcony training doesn't change trunk vulnerability.** The full balcony
-   exit and the no-balcony baseline reach near-identical final losses (0.253 vs
-   0.259) and near-identical loss reductions (84.1% vs 83.8%) despite the
-   balcony model having three extra exit heads. Adding exit heads doesn't make
-   the base model any more or less robust at full depth.
-
-5. **GCG suffixes don't degrade normal utility.** Prepending the strongest
-   GCG suffix to standard benchmarks causes < 1pp drops on most tasks (worst
-   case ~4pp on WinoGrande). The attack is narrowly targeted at harmful
-   completions, not a general disruption of language understanding. This holds
-   for both the balcony exits and the no-balcony baseline.
-
-6. **AdvBench confirms the pattern.** The depth → lower loss gradient holds
-   across both benchmarks, with AdvBench behaviors slightly easier to optimize
-   at shallow exits but converging at full depth.
-
----
-
-## Where to Find Each Experiment
-
-| Experiment | Script | Output |
-|---|---|---|
-| Baseline control (pre-attack losses) | `experiments/baseline_control.py` | `results/baseline_control.json` |
-| HarmBench GCG (50 behaviors, 150 steps) | `experiments/phase2_per_exit_transfer.py` | `results/phase2_attacks.json` |
-| No-balcony GCG baseline | `experiments/no_balcony_baseline.py` | `results/no_balcony_attacks.json` |
-| AdvBench GCG (50 behaviors, 150 steps) | `experiments/advbench_per_exit.py` | `results/advbench_attacks.json` |
-| Judge scoring + ASR | `experiments/judge_completions.py` | `results/judge_scores.json` |
-| Utility benchmarks (clean) | `experiments/eval_utility.py` | `results/utility_eval.json` |
-| Utility benchmarks (with GCG suffix) | `experiments/eval_utility_attacked.py` | `results/utility_eval_attacked.json` |
-| All figures | `experiments/visualize_results.py` | `results/figures/` |
-| Paper figures | `generate_paper_figures.py` | `paper_figures/` |
-| Full pipeline | `run_all.sh` | `results/logs/run_all.log` |
+Nine of eighteen are significant and every one points the same way: the exit is
+jailbroken *less* often than the full model. Not one goes the other direction.
