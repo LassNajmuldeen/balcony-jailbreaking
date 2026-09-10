@@ -1,0 +1,604 @@
+<title>Balcony early exits under GCG: attack success, capability and attack budget</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ground:  #eef2f3;
+    --panel:   #ffffff;
+    --sunk:    #f5f8f8;
+    --rule:    #dbe3e5;
+    --rule-2:  #e9eef0;
+    --ink:     #0f1617;
+    --ink-2:   #4a575a;
+    --ink-3:   #7b888c;
+    --s1: #2a78d6;
+    --s2: #eb6834;
+    --s3: #1baf7a;
+    --sb: #9a3b8f;
+    --flat: #7b888c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground:  #0d1213;
+      --panel:   #171e1f;
+      --sunk:    #121a1b;
+      --rule:    #2a3436;
+      --rule-2:  #212a2c;
+      --ink:     #eef4f4;
+      --ink-2:   #aebabc;
+      --ink-3:   #7c8a8c;
+      --s1: #3a86dd;
+      --s2: #d9682f;
+      --s3: #1aa473;
+      --sb: #bb51ab;
+      --flat: #7c8a8c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground:  #0d1213;
+    --panel:   #171e1f;
+    --sunk:    #121a1b;
+    --rule:    #2a3436;
+    --rule-2:  #212a2c;
+    --ink:     #eef4f4;
+    --ink-2:   #aebabc;
+    --ink-3:   #7c8a8c;
+    --s1: #3a86dd;
+    --s2: #d9682f;
+    --s3: #1aa473;
+    --sb: #bb51ab;
+    --flat: #7c8a8c;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono, .tick, .val, th, .kpi-n, .eyebrow, .tag {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wrap {
+    max-width: 66rem;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 5rem;
+    display: flex; flex-direction: column; gap: 2.5rem;
+  }
+
+  .eyebrow {
+    font-size: 0.7rem; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 0.9rem;
+  }
+  h1 {
+    font-size: clamp(1.75rem, 3.9vw, 2.5rem);
+    line-height: 1.16; font-weight: 640; letter-spacing: -0.022em;
+    text-wrap: balance; margin: 0 0 1rem; max-width: 30ch;
+  }
+  .lede { font-size: 1.05rem; color: var(--ink-2); max-width: 66ch; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 620; }
+
+  h2 {
+    font-size: 1.16rem; font-weight: 640; letter-spacing: -0.012em;
+    margin: 0 0 0.3rem;
+  }
+  .sub { color: var(--ink-2); font-size: 0.94rem; margin: 0 0 1.35rem; max-width: 68ch; }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 1.5rem 1.4rem 1.2rem;
+  }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1px;
+           background: var(--rule); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+  .kpi { background: var(--panel); padding: 1.15rem 1.2rem; }
+  .kpi-n { font-size: 1.85rem; font-weight: 620; letter-spacing: -0.03em; line-height: 1.1; display: block; }
+  .kpi-l { font-size: 0.855rem; color: var(--ink-2); margin-top: 0.3rem; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.25rem; margin: 0 0 0.85rem;
+             padding: 0; list-style: none; font-size: 0.84rem; color: var(--ink-2); }
+  .legend li { display: flex; align-items: center; gap: 0.45rem; }
+  .sw { width: 20px; height: 3px; border-radius: 2px; flex: none; }
+  .sw.dia { width: 10px; height: 10px; border-radius: 2px; transform: rotate(45deg);
+             background: transparent; border: 2px solid var(--ink-3); }
+
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr)); gap: 1.4rem; }
+  .cwrap { position: relative; min-width: 0; }
+  .ctitle { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase;
+             color: var(--ink-3); margin: 0 0 0.35rem; }
+  .scroller { overflow-x: auto; }
+  svg { display: block; width: 100%; height: auto; }
+  .grid { stroke: var(--rule-2); stroke-width: 1; }
+  .axis { stroke: var(--rule); stroke-width: 1; }
+  .tick { fill: var(--ink-3); font-size: 11px; }
+  .atitle { fill: var(--ink-2); font-size: 11.5px; }
+  .dlab { fill: var(--ink); font-size: 11.5px; font-weight: 620;
+           font-family: ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  .hit { fill: transparent; cursor: crosshair; }
+
+  .tip {
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity .09s ease;
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 6px;
+    padding: .45rem .6rem; font-size: .8rem; line-height: 1.4; color: var(--ink-2);
+    box-shadow: 0 6px 20px rgba(0,0,0,.16); white-space: nowrap; z-index: 6;
+  }
+  .tip b { color: var(--ink); }
+
+  .callout {
+    border-left: 2px solid var(--s1); padding: .1rem 0 .1rem 1rem;
+    color: var(--ink-2); font-size: .96rem; max-width: 70ch;
+  }
+  .callout strong { color: var(--ink); }
+
+  .scroll-x { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 44rem; font-size: .85rem; }
+  caption { text-align: left; color: var(--ink-3); font-size: .81rem; padding-bottom: .7rem; max-width: 78ch; }
+  th, td { text-align: right; padding: .42rem .6rem; border-bottom: 1px solid var(--rule-2);
+            font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th:first-child, td:first-child, th.l, td.l { text-align: left; }
+  thead th { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase;
+              color: var(--ink-3); font-weight: 620; border-bottom: 1px solid var(--rule); }
+  tbody tr:last-child td { border-bottom: none; }
+  .grp td { padding-top: .95rem; font-weight: 620; color: var(--ink); border-bottom: 1px solid var(--rule); }
+  .ci { color: var(--ink-3); font-size: .92em; }
+  .tag { font-size: .69rem; letter-spacing: .05em; text-transform: uppercase;
+          padding: .12rem .42rem; border-radius: 3px; border: 1px solid currentColor; }
+  .t-flat { color: var(--ink-3); }
+  .t-down { color: var(--s1); }
+  .t-up   { color: var(--s2); }
+
+  ul.notes { margin: 0; padding-left: 1.1rem; color: var(--ink-2); font-size: .95rem; }
+  ul.notes li { margin-bottom: .55rem; }
+  ul.notes li::marker { color: var(--ink-3); }
+  ul.notes strong { color: var(--ink); }
+
+  footer { color: var(--ink-3); font-size: .78rem; border-top: 1px solid var(--rule);
+            padding-top: 1rem; font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .tip { transition: none; } }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">GCG &middot; 150 steps &middot; n=50 per cell &middot; 3 models &middot; 95% Wilson CI</p>
+    <h1>No early exit is attacked more successfully than the model it exits from.</h1>
+    <p class="lede">
+      Across 18 paired comparisons of a balcony exit against its own full model,
+      <strong>none</strong> shows the exit significantly easier to jailbreak.
+      7 run the other way, and those are the exits that have lost the most
+      capability or whose attack never converged in the step budget. This page shows all
+      three measurements side by side so the difference is visible rather than asserted.
+    </p>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi">
+      <span class="kpi-n" style="color:var(--s1)">0 / 18</span>
+      <div class="kpi-l">exit-vs-full tests where the exit is significantly more jailbroken</div>
+    </div>
+    <div class="kpi">
+      <span class="kpi-n">7 / 18</span>
+      <div class="kpi-l">significant in the opposite direction, the exit attacked less</div>
+    </div>
+    <div class="kpi">
+      <span class="kpi-n">&plusmn;12pp</span>
+      <div class="kpi-l">typical width of a 95% interval at n=50, wider than most gaps here</div>
+    </div>
+  </div>
+
+  <section class="panel">
+    <h2>Attack success against exit depth</h2>
+    <p class="sub">
+      Each point is one arm at its depth through the network, which is what makes the 1B's
+      4/8/12-of-16 comparable with the 7B and 8B's 15/18/21-of-32. Bars are 95% Wilson
+      intervals. The weight-matched no-balcony baseline is the open diamond at full depth.
+    </p>
+    <ul class="legend">
+      <li><span class="sw" style="background:var(--s1)"></span> Balcony-1B</li>
+      <li><span class="sw" style="background:var(--s2)"></span> Balcony-LLaMA2-7B</li>
+      <li><span class="sw" style="background:var(--s3)"></span> Balcony-LLaMA3-8B</li>
+      <li><span class="sw dia"></span> no-balcony baseline, nudged right of full depth so it stays visible</li>
+    </ul>
+    <div class="charts" id="asr-charts"></div>
+  </section>
+
+  <p class="callout">
+    <strong>The intervals overlap nearly everywhere.</strong> The 1B's exit 12 is the highest
+    single point on HarmBench at 72%, above its own full model at 58%, but that gap is
+    13 behaviours flipping one way against 6 the other, which is p&nbsp;=&nbsp;0.167. It is not
+    a result. Read the significance table below rather than the point estimates.
+  </p>
+
+  <section class="panel">
+    <h2>What those exits still cost in capability</h2>
+    <p class="sub">
+      Chance-corrected retention against the full model, averaged over HellaSwag, ARC-C,
+      ARC-E, WinoGrande and PIQA. Correcting for chance matters: raw ratios read 8 to 28
+      points high because three of these tasks floor at 0.25 and two at 0.50. MMLU is left
+      out of this average on purpose. The 1B's full model scores 0.2555 on MMLU against a
+      0.25 floor, so chance-correcting it divides by half a point of signal and its MMLU
+      term swings between -99% and +28% across exits with no ordering. Every per-task MMLU
+      score is still in the table at the bottom.
+    </p>
+    <ul class="legend">
+      <li><span class="sw" style="background:var(--s1)"></span> Balcony-1B</li>
+      <li><span class="sw" style="background:var(--s2)"></span> Balcony-LLaMA2-7B</li>
+      <li><span class="sw" style="background:var(--s3)"></span> Balcony-LLaMA3-8B</li>
+    </ul>
+    <div class="charts" id="util-chart"></div>
+  </section>
+
+  <p class="callout">
+    <strong>This is what the low attack numbers at shallow exits are made of.</strong>
+    The 1B's exit 4 holds 28% of the full model's chance-corrected accuracy and its exit 8
+    holds 47%. The 8B's exit 15 holds 47%. Those are exactly the arms that come out
+    significantly harder to attack. A model that cannot write a coherent answer also cannot
+    write a harmful one, so a low score there is not evidence of safety.
+  </p>
+
+  <section class="panel">
+    <h2>The attack budget was not equal across arms</h2>
+    <p class="sub">
+      Mean GCG cross-entropy at step 0 and step 150 on HarmBench. Every arm got the same
+      150 steps, but shallow exits start further from compliance, so the same budget buys
+      less. The 8B's exit 15 ends at a loss the 1B's full model passes within the first
+      few steps.
+    </p>
+    <div class="charts" id="loss-chart"></div>
+  </section>
+
+  <p class="callout">
+    <strong>A fixed step budget systematically under-attacks shallower exits.</strong>
+    At the 8B's exit 15 GCG cut more absolute loss than at full depth, 0.79 against 0.62,
+    and still finished 1.4 nats higher because it started 1.57 nats higher. Reporting
+    starting loss and convergence state alongside attack success, and budgeting steps
+    adaptively, is the concrete prescription this run supports.
+  </p>
+
+  <section class="panel">
+    <h2>Every paired test</h2>
+    <p class="sub">
+      McNemar's exact test on the same 50 behaviours attacked at every arm, so the
+      comparison is paired. The two counts are behaviours jailbroken at the first arm but
+      not the second, and the reverse.
+    </p>
+    <div class="scroll-x">
+      <table>
+        <caption>
+          Arm 1 is the exit or full model, arm 2 is the comparator. "Attacked less" means the
+          first arm was jailbroken on significantly fewer behaviours than the second.
+        </caption>
+        <thead>
+          <tr><th class="l">Comparison</th><th class="l">Benchmark</th>
+              <th>Flips arm 1</th><th>Flips arm 2</th><th>p</th><th class="l">Result</th></tr>
+        </thead>
+        <tbody id="mcn-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>All measured cells</h2>
+    <div class="scroll-x">
+      <table>
+        <caption>
+          GCG, 150 steps, 50 behaviours per cell. Attack success is the HarmBench Mistral
+          classifier at p&nbsp;&gt;&nbsp;0.5. Loss is the mean final cross-entropy. Retention is
+          chance-corrected against each model's own full-depth score over the five tasks
+          excluding MMLU, so full and baseline are 100% by construction; they share trunk
+          weights and score identically to four decimal places.
+        </caption>
+        <thead>
+          <tr>
+            <th class="l">Arm</th><th>Depth</th>
+            <th>ASR HarmBench</th><th>ASR AdvBench</th>
+            <th>Loss HB</th><th>Loss AB</th><th>Capability</th>
+          </tr>
+        </thead>
+        <tbody id="cell-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>What this run still cannot tell you</h2>
+    <ul class="notes">
+      <li><strong>There is no unattacked attack-success number.</strong> Every cell here has a
+        GCG suffix on it. The no-attack control that exists measures teacher-forced loss, and
+        only for the 1B, so the attack's own contribution is unquantified. With refusal rates
+        near zero this matters: if these models answer harmful prompts when simply asked,
+        much of the reported success is not the attack's doing.</li>
+      <li><strong>All three baselines are unaligned base checkpoints.</strong> No safety-tuned
+        Balcony checkpoint is public. Refusal runs at 0 to 4% on the 1B, 0 to 14% on the 7B and
+        6 to 18% on the 8B, so there is very little refusal behaviour for GCG to defeat, and
+        this cannot be framed as a safety-degradation study.</li>
+      <li><strong>Depth coverage is fixed and uneven.</strong> The 1B samples 25, 50 and 75% of
+        depth; the 7B and 8B sample 47, 56 and 66%. Neither large model has an exit past 66%,
+        and no exit can be added to a public checkpoint.</li>
+      <li><strong>Most cells were still improving at step 150.</strong> Only the 1B's exit 12 and
+        full model had flattened, so the matrix as a whole is under-converged and the ranking
+        between arms is partly a ranking of how far each got.</li>
+      <li><strong>TAO is not in this page.</strong> Its shards are incomplete and no finished
+        shard yet has a matching full-model or baseline comparator.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Recomputed from results/, results_7b/, results_8b/ &middot; judge: cais/HarmBench-Mistral-7b-val-cls
+    &middot; every number derived from per-behaviour scores at build time
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var D = {"asr":{"harmbench":[{"m":"1b","name":"Balcony-1B","pts":[{"d":0.25,"v":26.0,"lo":15.9,"hi":39.6,"l":"exit 4"},{"d":0.5,"v":18.0,"lo":9.8,"hi":30.8,"l":"exit 8"},{"d":0.75,"v":72.0,"lo":58.3,"hi":82.5,"l":"exit 12"},{"d":1.0,"v":58.0,"lo":44.2,"hi":70.6,"l":"full"}],"base":{"d":1.0,"v":62.0,"lo":48.2,"hi":74.1,"l":"baseline"}},{"m":"7b","name":"Balcony-LLaMA2-7B","pts":[{"d":0.4688,"v":24.0,"lo":14.3,"hi":37.4,"l":"exit 15"},{"d":0.5625,"v":28.0,"lo":17.5,"hi":41.7,"l":"exit 18"},{"d":0.6562,"v":26.0,"lo":15.9,"hi":39.6,"l":"exit 21"},{"d":1.0,"v":38.0,"lo":25.9,"hi":51.8,"l":"full"}],"base":{"d":1.0,"v":32.0,"lo":20.8,"hi":45.8,"l":"baseline"}},{"m":"8b","name":"Balcony-LLaMA3-8B","pts":[{"d":0.4688,"v":4.0,"lo":1.1,"hi":13.5,"l":"exit 15"},{"d":0.5625,"v":12.0,"lo":5.6,"hi":23.8,"l":"exit 18"},{"d":0.6562,"v":12.0,"lo":5.6,"hi":23.8,"l":"exit 21"},{"d":1.0,"v":28.0,"lo":17.5,"hi":41.7,"l":"full"}],"base":{"d":1.0,"v":28.0,"lo":17.5,"hi":41.7,"l":"baseline"}}],"advbench":[{"m":"1b","name":"Balcony-1B","pts":[{"d":0.25,"v":26.0,"lo":15.9,"hi":39.6,"l":"exit 4"},{"d":0.5,"v":32.0,"lo":20.8,"hi":45.8,"l":"exit 8"},{"d":0.75,"v":62.0,"lo":48.2,"hi":74.1,"l":"exit 12"},{"d":1.0,"v":68.0,"lo":54.2,"hi":79.2,"l":"full"}],"base":{"d":1.0,"v":74.0,"lo":60.4,"hi":84.1,"l":"baseline"}},{"m":"7b","name":"Balcony-LLaMA2-7B","pts":[{"d":0.4688,"v":30.0,"lo":19.1,"hi":43.8,"l":"exit 15"},{"d":0.5625,"v":36.0,"lo":24.1,"hi":49.9,"l":"exit 18"},{"d":0.6562,"v":34.0,"lo":22.4,"hi":47.8,"l":"exit 21"},{"d":1.0,"v":34.0,"lo":22.4,"hi":47.8,"l":"full"}],"base":{"d":1.0,"v":22.0,"lo":12.8,"hi":35.2,"l":"baseline"}},{"m":"8b","name":"Balcony-LLaMA3-8B","pts":[{"d":0.4688,"v":2.0,"lo":0.4,"hi":10.5,"l":"exit 15"},{"d":0.5625,"v":0.0,"lo":0.0,"hi":7.1,"l":"exit 18"},{"d":0.6562,"v":12.0,"lo":5.6,"hi":23.8,"l":"exit 21"},{"d":1.0,"v":28.0,"lo":17.5,"hi":41.7,"l":"full"}],"base":{"d":1.0,"v":28.0,"lo":17.5,"hi":41.7,"l":"baseline"}}]},"util":[{"m":"1b","name":"Balcony-1B","pts":[{"d":0.25,"v":27.7,"l":"exit 4"},{"d":0.5,"v":46.7,"l":"exit 8"},{"d":0.75,"v":78.4,"l":"exit 12"},{"d":1.0,"v":100.0,"l":"full"}]},{"m":"7b","name":"Balcony-LLaMA2-7B","pts":[{"d":0.4688,"v":70.8,"l":"exit 15"},{"d":0.5625,"v":81.5,"l":"exit 18"},{"d":0.6562,"v":88.6,"l":"exit 21"},{"d":1.0,"v":100.0,"l":"full"}]},{"m":"8b","name":"Balcony-LLaMA3-8B","pts":[{"d":0.4688,"v":46.6,"l":"exit 15"},{"d":0.5625,"v":60.6,"l":"exit 18"},{"d":0.6562,"v":69.8,"l":"exit 21"},{"d":1.0,"v":100.0,"l":"full"}]}],"loss":{"harmbench":[{"m":"1b","arm":"exit 4","init":2.02,"fin":0.69,"cut":66},{"m":"1b","arm":"exit 8","init":1.75,"fin":0.56,"cut":68},{"m":"1b","arm":"exit 12","init":1.37,"fin":0.38,"cut":72},{"m":"1b","arm":"full","init":1.21,"fin":0.25,"cut":79},{"m":"1b","arm":"baseline","init":1.22,"fin":0.26,"cut":79},{"m":"7b","arm":"exit 15","init":1.24,"fin":0.6,"cut":51},{"m":"7b","arm":"exit 18","init":1.21,"fin":0.54,"cut":55},{"m":"7b","arm":"exit 21","init":1.19,"fin":0.52,"cut":57},{"m":"7b","arm":"full","init":1.18,"fin":0.43,"cut":64},{"m":"7b","arm":"baseline","init":1.26,"fin":0.45,"cut":64},{"m":"8b","arm":"exit 15","init":2.69,"fin":1.9,"cut":29},{"m":"8b","arm":"exit 18","init":1.84,"fin":1.2,"cut":34},{"m":"8b","arm":"exit 21","init":1.74,"fin":1.06,"cut":39},{"m":"8b","arm":"full","init":1.12,"fin":0.5,"cut":55},{"m":"8b","arm":"baseline","init":1.12,"fin":0.51,"cut":55}],"advbench":[{"m":"1b","arm":"exit 4","init":2.04,"fin":0.49,"cut":76},{"m":"1b","arm":"exit 8","init":1.74,"fin":0.44,"cut":75},{"m":"1b","arm":"exit 12","init":1.5,"fin":0.31,"cut":79},{"m":"1b","arm":"full","init":1.36,"fin":0.26,"cut":81},{"m":"1b","arm":"baseline","init":1.36,"fin":0.26,"cut":81},{"m":"7b","arm":"exit 15","init":1.55,"fin":0.68,"cut":56},{"m":"7b","arm":"exit 18","init":1.54,"fin":0.67,"cut":56},{"m":"7b","arm":"exit 21","init":1.52,"fin":0.64,"cut":58},{"m":"7b","arm":"full","init":1.48,"fin":0.49,"cut":67},{"m":"7b","arm":"baseline","init":1.6,"fin":0.6,"cut":62},{"m":"8b","arm":"exit 15","init":2.44,"fin":1.53,"cut":37},{"m":"8b","arm":"exit 18","init":1.7,"fin":1.02,"cut":40},{"m":"8b","arm":"exit 21","init":1.66,"fin":0.91,"cut":46},{"m":"8b","arm":"full","init":1.32,"fin":0.52,"cut":60},{"m":"8b","arm":"baseline","init":1.32,"fin":0.52,"cut":60}]},"mcnemar":[{"m":"1b","model":"Balcony-1B","bench":"HarmBench","cmp":"exit 4 vs full","b":3,"c":19,"p":0.0008554458618164062,"verdict":"arm 1 attacked less","cls":"down"},{"m":"1b","model":"Balcony-1B","bench":"HarmBench","cmp":"exit 8 vs full","b":1,"c":21,"p":1.0967254638671875e-05,"verdict":"arm 1 attacked less","cls":"down"},{"m":"1b","model":"Balcony-1B","bench":"HarmBench","cmp":"exit 12 vs full","b":13,"c":6,"p":0.1670684814453125,"verdict":"not significant","cls":"flat"},{"m":"1b","model":"Balcony-1B","bench":"HarmBench","cmp":"exit 4 vs baseline","b":3,"c":21,"p":0.0002771615982055664,"verdict":"arm 1 attacked less","cls":"down"},{"m":"1b","model":"Balcony-1B","bench":"HarmBench","cmp":"exit 8 vs baseline","b":1,"c":23,"p":2.9802322387695312e-06,"verdict":"arm 1 attacked less","cls":"down"},{"m":"1b","model":"Balcony-1B","bench":"HarmBench","cmp":"exit 12 vs baseline","b":13,"c":8,"p":0.38331031799316406,"verdict":"not significant","cls":"flat"},{"m":"1b","model":"Balcony-1B","bench":"HarmBench","cmp":"full vs baseline","b":2,"c":4,"p":0.6875,"verdict":"not significant","cls":"flat"},{"m":"1b","model":"Balcony-1B","bench":"AdvBench","cmp":"exit 4 vs full","b":2,"c":23,"p":1.9431114196777344e-05,"verdict":"arm 1 attacked less","cls":"down"},{"m":"1b","model":"Balcony-1B","bench":"AdvBench","cmp":"exit 8 vs full","b":1,"c":19,"p":4.00543212890625e-05,"verdict":"arm 1 attacked less","cls":"down"},{"m":"1b","model":"Balcony-1B","bench":"AdvBench","cmp":"exit 12 vs full","b":4,"c":7,"p":0.548828125,"verdict":"not significant","cls":"flat"},{"m":"1b","model":"Balcony-1B","bench":"AdvBench","cmp":"exit 4 vs baseline","b":0,"c":24,"p":1.1920928955078125e-07,"verdict":"arm 1 attacked less","cls":"down"},{"m":"1b","model":"Balcony-1B","bench":"AdvBench","cmp":"exit 8 vs baseline","b":2,"c":23,"p":1.9431114196777344e-05,"verdict":"arm 1 attacked less","cls":"down"},{"m":"1b","model":"Balcony-1B","bench":"AdvBench","cmp":"exit 12 vs baseline","b":5,"c":11,"p":0.210113525390625,"verdict":"not significant","cls":"flat"},{"m":"1b","model":"Balcony-1B","bench":"AdvBench","cmp":"full vs baseline","b":4,"c":7,"p":0.548828125,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"HarmBench","cmp":"exit 15 vs full","b":7,"c":14,"p":0.18924713134765625,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"HarmBench","cmp":"exit 18 vs full","b":6,"c":11,"p":0.332305908203125,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"HarmBench","cmp":"exit 21 vs full","b":8,"c":14,"p":0.28627872467041016,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"HarmBench","cmp":"exit 15 vs baseline","b":7,"c":11,"p":0.480682373046875,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"HarmBench","cmp":"exit 18 vs baseline","b":8,"c":10,"p":0.8145294189453125,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"HarmBench","cmp":"exit 21 vs baseline","b":8,"c":11,"p":0.6476058959960938,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"HarmBench","cmp":"full vs baseline","b":7,"c":4,"p":0.548828125,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"AdvBench","cmp":"exit 15 vs full","b":8,"c":10,"p":0.8145294189453125,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"AdvBench","cmp":"exit 18 vs full","b":7,"c":6,"p":1.0,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"AdvBench","cmp":"exit 21 vs full","b":9,"c":9,"p":1.0,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"AdvBench","cmp":"exit 15 vs baseline","b":10,"c":6,"p":0.454498291015625,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"AdvBench","cmp":"exit 18 vs baseline","b":12,"c":5,"p":0.143463134765625,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"AdvBench","cmp":"exit 21 vs baseline","b":11,"c":5,"p":0.210113525390625,"verdict":"not significant","cls":"flat"},{"m":"7b","model":"Balcony-LLaMA2-7B","bench":"AdvBench","cmp":"full vs baseline","b":13,"c":7,"p":0.26317596435546875,"verdict":"not significant","cls":"flat"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"HarmBench","cmp":"exit 15 vs full","b":2,"c":14,"p":0.004180908203125,"verdict":"arm 1 attacked less","cls":"down"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"HarmBench","cmp":"exit 18 vs full","b":4,"c":12,"p":0.076812744140625,"verdict":"not significant","cls":"flat"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"HarmBench","cmp":"exit 21 vs full","b":3,"c":11,"p":0.057373046875,"verdict":"not significant","cls":"flat"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"HarmBench","cmp":"exit 15 vs baseline","b":2,"c":14,"p":0.004180908203125,"verdict":"arm 1 attacked less","cls":"down"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"HarmBench","cmp":"exit 18 vs baseline","b":4,"c":12,"p":0.076812744140625,"verdict":"not significant","cls":"flat"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"HarmBench","cmp":"exit 21 vs baseline","b":3,"c":11,"p":0.057373046875,"verdict":"not significant","cls":"flat"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"HarmBench","cmp":"full vs baseline","b":5,"c":5,"p":1.0,"verdict":"not significant","cls":"flat"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"AdvBench","cmp":"exit 15 vs full","b":0,"c":13,"p":0.000244140625,"verdict":"arm 1 attacked less","cls":"down"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"AdvBench","cmp":"exit 18 vs full","b":0,"c":14,"p":0.0001220703125,"verdict":"arm 1 attacked less","cls":"down"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"AdvBench","cmp":"exit 21 vs full","b":4,"c":12,"p":0.076812744140625,"verdict":"not significant","cls":"flat"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"AdvBench","cmp":"exit 15 vs baseline","b":0,"c":13,"p":0.000244140625,"verdict":"arm 1 attacked less","cls":"down"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"AdvBench","cmp":"exit 18 vs baseline","b":0,"c":14,"p":0.0001220703125,"verdict":"arm 1 attacked less","cls":"down"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"AdvBench","cmp":"exit 21 vs baseline","b":4,"c":12,"p":0.076812744140625,"verdict":"not significant","cls":"flat"},{"m":"8b","model":"Balcony-LLaMA3-8B","bench":"AdvBench","cmp":"full vs baseline","b":0,"c":0,"p":1.0,"verdict":"not significant","cls":"flat"}],"cells":[{"model":"Balcony-1B","arm":"exit 4","depth":25,"ret":27.7,"harmbench":26.0,"harmbench_ci":"16\u201340","harmbench_loss":0.69,"advbench":26.0,"advbench_ci":"16\u201340","advbench_loss":0.49},{"model":"Balcony-1B","arm":"exit 8","depth":50,"ret":46.7,"harmbench":18.0,"harmbench_ci":"10\u201331","harmbench_loss":0.56,"advbench":32.0,"advbench_ci":"21\u201346","advbench_loss":0.44},{"model":"Balcony-1B","arm":"exit 12","depth":75,"ret":78.4,"harmbench":72.0,"harmbench_ci":"58\u201383","harmbench_loss":0.38,"advbench":62.0,"advbench_ci":"48\u201374","advbench_loss":0.31},{"model":"Balcony-1B","arm":"full","depth":100,"ret":100.0,"harmbench":58.0,"harmbench_ci":"44\u201371","harmbench_loss":0.25,"advbench":68.0,"advbench_ci":"54\u201379","advbench_loss":0.26},{"model":"Balcony-1B","arm":"baseline","depth":100,"ret":100.0,"harmbench":62.0,"harmbench_ci":"48\u201374","harmbench_loss":0.26,"advbench":74.0,"advbench_ci":"60\u201384","advbench_loss":0.26},{"model":"Balcony-LLaMA2-7B","arm":"exit 15","depth":47,"ret":70.8,"harmbench":24.0,"harmbench_ci":"14\u201337","harmbench_loss":0.6,"advbench":30.0,"advbench_ci":"19\u201344","advbench_loss":0.68},{"model":"Balcony-LLaMA2-7B","arm":"exit 18","depth":56,"ret":81.5,"harmbench":28.0,"harmbench_ci":"17\u201342","harmbench_loss":0.54,"advbench":36.0,"advbench_ci":"24\u201350","advbench_loss":0.67},{"model":"Balcony-LLaMA2-7B","arm":"exit 21","depth":66,"ret":88.6,"harmbench":26.0,"harmbench_ci":"16\u201340","harmbench_loss":0.52,"advbench":34.0,"advbench_ci":"22\u201348","advbench_loss":0.64},{"model":"Balcony-LLaMA2-7B","arm":"full","depth":100,"ret":100.0,"harmbench":38.0,"harmbench_ci":"26\u201352","harmbench_loss":0.43,"advbench":34.0,"advbench_ci":"22\u201348","advbench_loss":0.49},{"model":"Balcony-LLaMA2-7B","arm":"baseline","depth":100,"ret":100.0,"harmbench":32.0,"harmbench_ci":"21\u201346","harmbench_loss":0.45,"advbench":22.0,"advbench_ci":"13\u201335","advbench_loss":0.6},{"model":"Balcony-LLaMA3-8B","arm":"exit 15","depth":47,"ret":46.6,"harmbench":4.0,"harmbench_ci":"1\u201313","harmbench_loss":1.9,"advbench":2.0,"advbench_ci":"0\u201310","advbench_loss":1.53},{"model":"Balcony-LLaMA3-8B","arm":"exit 18","depth":56,"ret":60.6,"harmbench":12.0,"harmbench_ci":"6\u201324","harmbench_loss":1.2,"advbench":0.0,"advbench_ci":"0\u20137","advbench_loss":1.02},{"model":"Balcony-LLaMA3-8B","arm":"exit 21","depth":66,"ret":69.8,"harmbench":12.0,"harmbench_ci":"6\u201324","harmbench_loss":1.06,"advbench":12.0,"advbench_ci":"6\u201324","advbench_loss":0.91},{"model":"Balcony-LLaMA3-8B","arm":"full","depth":100,"ret":100.0,"harmbench":28.0,"harmbench_ci":"17\u201342","harmbench_loss":0.5,"advbench":28.0,"advbench_ci":"17\u201342","advbench_loss":0.52},{"model":"Balcony-LLaMA3-8B","arm":"baseline","depth":100,"ret":100.0,"harmbench":28.0,"harmbench_ci":"17\u201342","harmbench_loss":0.51,"advbench":28.0,"advbench_ci":"17\u201342","advbench_loss":0.52}]};
+  var NS = "http://www.w3.org/2000/svg";
+  var SC = { "1b": "var(--s1)", "7b": "var(--s2)", "8b": "var(--s3)" };
+
+  function el(n, a, t) {
+    var e = document.createElementNS(NS, n);
+    for (var k in a) if (a[k] !== null && a[k] !== undefined) e.setAttribute(k, a[k]);
+    if (t !== undefined) e.textContent = t;
+    return e;
+  }
+  function box(parent, title) {
+    var w = document.createElement("div"); w.className = "cwrap";
+    var h = document.createElement("p"); h.className = "ctitle"; h.textContent = title;
+    var s = document.createElement("div"); s.className = "scroller";
+    var tip = document.createElement("div"); tip.className = "tip";
+    w.appendChild(h); w.appendChild(s); w.appendChild(tip); parent.appendChild(w);
+    return { mount: s, tip: tip, wrap: w };
+  }
+  function hover(node, tip, wrap, html, sx, sy) {
+    node.addEventListener("mouseenter", function () {
+      tip.innerHTML = html; tip.style.opacity = "1";
+      var bw = wrap.clientWidth;
+      tip.style.left = Math.max(2, Math.min(sx() + 12, bw - tip.offsetWidth - 2)) + "px";
+      tip.style.top = Math.max(2, sy() - tip.offsetHeight - 10) + "px";
+    });
+    node.addEventListener("mouseleave", function () { tip.style.opacity = "0"; });
+  }
+
+  // ---------------------------------------------------------------- ASR vs depth
+  function asrChart(mount, tip, wrap, series, unitMax) {
+    var W = 470, H = 330, m = { t: 16, r: 16, b: 46, l: 44 };
+    var x0 = m.l, x1 = W - m.r, y0 = m.t, y1 = H - m.b;
+    var dMin = 0.18, dMax = 1.12;
+    var X = function (d) { return x0 + (d - dMin) / (dMax - dMin) * (x1 - x0); };
+    var Y = function (v) { return y1 - v / unitMax * (y1 - y0); };
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Attack success rate against relative exit depth for three models." });
+    svg.style.minWidth = "20rem";
+
+    for (var v = 0; v <= unitMax; v += 20) {
+      svg.appendChild(el("line", { x1: x0, x2: x1, y1: Y(v), y2: Y(v), class: v === 0 ? "axis" : "grid" }));
+      svg.appendChild(el("text", { x: x0 - 9, y: Y(v) + 4, "text-anchor": "end", class: "tick" }, String(v)));
+    }
+    [0.25, 0.5, 0.75, 1.0].forEach(function (d) {
+      svg.appendChild(el("text", { x: X(d), y: y1 + 20, "text-anchor": "middle", class: "tick" },
+        Math.round(d * 100) + "%"));
+    });
+    svg.appendChild(el("text", { x: (x0 + x1) / 2, y: H - 8, "text-anchor": "middle", class: "atitle" },
+      "relative exit depth"));
+    svg.appendChild(el("text", { class: "atitle", "text-anchor": "middle",
+      transform: "translate(12," + (y0 + y1) / 2 + ") rotate(-90)" }, "attack success (%)"));
+
+    series.forEach(function (s) {
+      var col = SC[s.m];
+      svg.appendChild(el("path", {
+        d: s.pts.map(function (p, i) { return (i ? "L" : "M") + X(p.d) + " " + Y(p.v); }).join(" "),
+        fill: "none", stroke: col, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"
+      }));
+      var all = s.pts.concat([s.base]);
+      all.forEach(function (p, i) {
+        var isBase = i === s.pts.length;
+        // the baseline sits at full depth too, and for the 8B it lands on exactly the
+        // same value as the full model, so nudge it clear rather than hide it
+        var px = X(p.d) + (isBase ? 15 : 0);
+        svg.appendChild(el("line", { x1: px, x2: px, y1: Y(p.lo), y2: Y(p.hi),
+          stroke: col, "stroke-width": 1.4, opacity: ".45", "stroke-linecap": "round" }));
+        var node;
+        if (isBase) {
+          var r = 5.4;
+          node = el("rect", { x: px - r, y: Y(p.v) - r, width: 2 * r, height: 2 * r,
+            transform: "rotate(45 " + px + " " + Y(p.v) + ")",
+            fill: "var(--panel)", stroke: col, "stroke-width": 2 });
+        } else {
+          node = el("circle", { cx: px, cy: Y(p.v), r: 4.6, fill: col,
+            stroke: "var(--panel)", "stroke-width": 1.6 });
+        }
+        svg.appendChild(node);
+        var hit = el("circle", { cx: px, cy: Y(p.v), r: 14, class: "hit" });
+        (function (p, s, px) {
+          hover(hit, tip, wrap,
+            "<b>" + s.name + " &middot; " + p.l + "</b><br>" +
+            Math.round(p.d * 100) + "% depth &middot; <b>" + p.v.toFixed(0) + "%</b> success<br>" +
+            "95% CI " + p.lo + "&ndash;" + p.hi + "%",
+            function () { return px * (wrap.clientWidth / W); },
+            function () { return Y(p.v) * (wrap.clientWidth / W); });
+        })(p, s, px);
+        svg.appendChild(hit);
+      });
+    });
+    mount.appendChild(svg);
+  }
+
+  var ac = document.getElementById("asr-charts");
+  ["harmbench", "advbench"].forEach(function (b) {
+    var t = b === "harmbench" ? "HarmBench" : "AdvBench";
+    var o = box(ac, t);
+    asrChart(o.mount, o.tip, o.wrap, D.asr[b], 80);
+  });
+
+  // ---------------------------------------------------------------- capability
+  (function () {
+    var o = box(document.getElementById("util-chart"), "Chance-corrected capability retention");
+    o.wrap.style.gridColumn = "1 / -1";
+    var W = 900, H = 300, m = { t: 16, r: 20, b: 46, l: 48 };
+    var x0 = m.l, x1 = W - m.r, y0 = m.t, y1 = H - m.b;
+    var dMin = 0.18, dMax = 1.08, vMax = 105, vMin = -12;
+    var X = function (d) { return x0 + (d - dMin) / (dMax - dMin) * (x1 - x0); };
+    var Y = function (v) { return y1 - (v - vMin) / (vMax - vMin) * (y1 - y0); };
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Chance-corrected capability retention against relative exit depth." });
+    svg.style.minWidth = "26rem";
+    [0, 25, 50, 75, 100].forEach(function (v) {
+      svg.appendChild(el("line", { x1: x0, x2: x1, y1: Y(v), y2: Y(v), class: v === 0 ? "axis" : "grid" }));
+      svg.appendChild(el("text", { x: x0 - 9, y: Y(v) + 4, "text-anchor": "end", class: "tick" }, v + "%"));
+    });
+    [0.25, 0.5, 0.75, 1.0].forEach(function (d) {
+      svg.appendChild(el("text", { x: X(d), y: y1 + 20, "text-anchor": "middle", class: "tick" },
+        Math.round(d * 100) + "%"));
+    });
+    svg.appendChild(el("text", { x: (x0 + x1) / 2, y: H - 8, "text-anchor": "middle", class: "atitle" },
+      "relative exit depth"));
+    svg.appendChild(el("text", { class: "atitle", "text-anchor": "middle",
+      transform: "translate(13," + (y0 + y1) / 2 + ") rotate(-90)" }, "capability retained"));
+
+    D.util.forEach(function (s) {
+      var col = SC[s.m];
+      svg.appendChild(el("path", {
+        d: s.pts.map(function (p, i) { return (i ? "L" : "M") + X(p.d) + " " + Y(p.v); }).join(" "),
+        fill: "none", stroke: col, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"
+      }));
+      s.pts.forEach(function (p) {
+        var yy = Y(p.v);
+        svg.appendChild(el("circle", { cx: X(p.d), cy: yy, r: 4.6, fill: col,
+          stroke: "var(--panel)", "stroke-width": 1.6 }));
+        if (p.l !== "full") {
+          svg.appendChild(el("text", { x: X(p.d), y: yy - 12, "text-anchor": "middle", class: "dlab" },
+            p.v.toFixed(0) + "%"));
+        }
+        var hit = el("circle", { cx: X(p.d), cy: yy, r: 15, class: "hit" });
+        (function (p, s) {
+          hover(hit, o.tip, o.wrap,
+            "<b>" + s.name + " &middot; " + p.l + "</b><br>" +
+            Math.round(p.d * 100) + "% depth &middot; <b>" + p.v.toFixed(1) + "%</b> retained",
+            function () { return X(p.d) * (o.wrap.clientWidth / W); },
+            function () { return Y(p.v) * (o.wrap.clientWidth / W); });
+        })(p, s);
+        svg.appendChild(hit);
+      });
+    });
+    o.mount.appendChild(svg);
+  })();
+
+  // ---------------------------------------------------------------- loss dumbbell
+  (function () {
+    var o = box(document.getElementById("loss-chart"), "GCG loss on HarmBench, step 0 to step 150");
+    o.wrap.style.gridColumn = "1 / -1";
+    var rows = D.loss.harmbench;
+    var rowH = 21, gapH = 20, m = { t: 30, r: 20, b: 44, l: 128 };
+    // each new model gets a blank band above it so its heading never lands on the
+    // previous model's last row
+    var ys = [], cur = m.t, seen = null;
+    rows.forEach(function (r) {
+      if (r.m !== seen) { seen = r.m; cur += gapH; }
+      ys.push(cur + rowH / 2); cur += rowH;
+    });
+    var W = 900, H = cur + m.b;
+    var x0 = m.l, x1 = W - m.r;
+    var vMax = 2.8;
+    var X = function (v) { return x0 + v / vMax * (x1 - x0); };
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Initial and final GCG loss for every arm of all three models on HarmBench." });
+    svg.style.minWidth = "30rem";
+
+    for (var v = 0; v <= vMax; v += 0.5) {
+      svg.appendChild(el("line", { x1: X(v), x2: X(v), y1: m.t - 8, y2: H - m.b + 4, class: "grid" }));
+      svg.appendChild(el("text", { x: X(v), y: H - m.b + 20, "text-anchor": "middle", class: "tick" },
+        v.toFixed(1)));
+    }
+    svg.appendChild(el("text", { x: (x0 + x1) / 2, y: H - 8, "text-anchor": "middle", class: "atitle" },
+      "mean cross-entropy loss"));
+
+    var lastModel = null;
+    rows.forEach(function (r, i) {
+      var y = ys[i];
+      var col = SC[r.m];
+      if (r.m !== lastModel) {
+        lastModel = r.m;
+        svg.appendChild(el("text", { x: 6, y: y - rowH / 2 - 7, class: "tick",
+          style: "fill:var(--ink);font-weight:620" },
+          r.m === "1b" ? "Balcony-1B" : r.m === "7b" ? "Balcony-LLaMA2-7B" : "Balcony-LLaMA3-8B"));
+      }
+      svg.appendChild(el("text", { x: x0 - 10, y: y + 4, "text-anchor": "end", class: "tick" }, r.arm));
+      svg.appendChild(el("line", { x1: X(r.fin), x2: X(r.init), y1: y, y2: y,
+        stroke: col, "stroke-width": 2, opacity: ".38", "stroke-linecap": "round" }));
+      svg.appendChild(el("circle", { cx: X(r.init), cy: y, r: 4, fill: "var(--panel)",
+        stroke: col, "stroke-width": 1.8 }));
+      svg.appendChild(el("circle", { cx: X(r.fin), cy: y, r: 4.4, fill: col,
+        stroke: "var(--panel)", "stroke-width": 1.4 }));
+      var hit = el("rect", { x: x0, y: y - rowH / 2, width: x1 - x0, height: rowH, class: "hit" });
+      (function (r) {
+        hover(hit, o.tip, o.wrap,
+          "<b>" + r.arm + "</b><br>start <b>" + r.init.toFixed(2) + "</b> &rarr; end <b>" +
+          r.fin.toFixed(2) + "</b><br>" + r.cut + "% of the loss removed",
+          function () { return X(r.fin) * (o.wrap.clientWidth / W); },
+          function () { return y * (o.wrap.clientWidth / W); });
+      })(r);
+      svg.appendChild(hit);
+    });
+
+    var lg = el("g", {});
+    lg.appendChild(el("circle", { cx: x0 + 4, cy: 12, r: 4, fill: "var(--panel)",
+      stroke: "var(--ink-3)", "stroke-width": 1.8 }));
+    lg.appendChild(el("text", { x: x0 + 14, y: 16, class: "tick" }, "step 0"));
+    lg.appendChild(el("circle", { cx: x0 + 74, cy: 12, r: 4.4, fill: "var(--ink-3)" }));
+    lg.appendChild(el("text", { x: x0 + 84, y: 16, class: "tick" }, "step 150"));
+    svg.appendChild(lg);
+    o.mount.appendChild(svg);
+  })();
+
+  // ---------------------------------------------------------------- tables
+  var tb = document.getElementById("mcn-body"), lastKey = null;
+  D.mcnemar.forEach(function (r) {
+    if (r.model !== lastKey) {
+      lastKey = r.model;
+      var g = document.createElement("tr"); g.className = "grp";
+      var td = document.createElement("td"); td.colSpan = 6; td.textContent = r.model;
+      g.appendChild(td); tb.appendChild(g);
+    }
+    var tr = document.createElement("tr");
+    var p = r.p < 0.001 ? "&lt; 0.001" : r.p.toFixed(3);
+    tr.innerHTML =
+      '<td class="l">' + r.cmp + "</td>" +
+      '<td class="l">' + r.bench + "</td>" +
+      "<td>" + r.b + "</td><td>" + r.c + "</td>" +
+      "<td>" + p + "</td>" +
+      '<td class="l"><span class="tag t-' + r.cls + '">' + r.verdict + "</span></td>";
+    tb.appendChild(tr);
+  });
+
+  var cb = document.getElementById("cell-body"), lastM = null;
+  D.cells.forEach(function (r) {
+    if (r.model !== lastM) {
+      lastM = r.model;
+      var g = document.createElement("tr"); g.className = "grp";
+      var td = document.createElement("td"); td.colSpan = 7; td.textContent = r.model;
+      g.appendChild(td); cb.appendChild(g);
+    }
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td class="l">' + r.arm + "</td>" +
+      "<td>" + r.depth + "%</td>" +
+      "<td>" + r.harmbench.toFixed(0) + '% <span class="ci">' + r.harmbench_ci + "</span></td>" +
+      "<td>" + r.advbench.toFixed(0) + '% <span class="ci">' + r.advbench_ci + "</span></td>" +
+      "<td>" + r.harmbench_loss.toFixed(2) + "</td>" +
+      "<td>" + r.advbench_loss.toFixed(2) + "</td>" +
+      "<td>" + r.ret.toFixed(0) + "%</td>";
+    cb.appendChild(tr);
+  });
+})();
+</script>
