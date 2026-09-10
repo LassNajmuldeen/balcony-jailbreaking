@@ -42,20 +42,21 @@ import adapter.balcony_llama  # noqa: F401
 from adapter.exit_wrapper import wrap_for_single_exit, wrap_plain_model
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from adversariallm.lm_utils import get_disallowed_ids
+from adversariallm.lm_utils import get_disallowed_ids, prepare_conversation
 
 from rouge_score import rouge_scorer
 
 from behavior_datasets import load_benchmark  # noqa: E402
 from config import (  # noqa: E402
     ATTACK_TARGET,
+    BEHAVIOR_START,
+    BEHAVIOR_END,
     BENCHMARK,
     BASELINE_MODEL,
     result_filename,
     ensure_chat_template,
     EXITS,
     MAX_NEW_TOKENS,
-    N_BEHAVIORS,
     NUM_STEPS,
     RESULTS_DIR,
     describe,
@@ -119,39 +120,86 @@ class SimpleSuffixManager:
         self.instruction = instruction
         self.target = target
         self.adv_string = adv_string
+        # length of the prompt segment with no suffix on it. cached because it
+        # only depends on the instruction and get_prompt runs every step
+        self._n_goal_prompt = None
+
+    def _segments(self, user_content):
+        """the six pieces prepare_conversation splits a conversation into:
+        pre, attack_prefix, prompt, attack_suffix, post, target."""
+        return prepare_conversation(
+            self.tokenizer,
+            [
+                {"role": "user", "content": user_content},
+                {"role": "assistant", "content": self.target},
+            ],
+        )[0]
 
     def get_prompt(self, adv_string=None):
         if adv_string is not None:
             self.adv_string = adv_string
 
-        # each part is tokenized on its own so the boundaries are known exactly.
-        # only the instruction gets the special tokens, the other two are
-        # continuations of it
-        instr_ids = self.tokenizer.encode(self.instruction, add_special_tokens=True)
-        space_adv = " " + self.adv_string
-        adv_ids = self.tokenizer.encode(space_adv, add_special_tokens=False)
-        target_ids = self.tokenizer.encode(" " + self.target, add_special_tokens=False)
+        # CHANGED 2026-09-03 to produce the exact token sequence GCG produces.
+        #
+        # this used to tokenize the three pieces on their own and glue them, which
+        # differed from GCG in two ways that nobody had noticed:
+        #
+        #   1. no chat template AT ALL. TAO calls ensure_chat_template(), which
+        #      sets tokenizer.chat_template, but it never called
+        #      apply_chat_template, so CHAT_TEMPLATE was a dead env var here. on
+        #      the 7B that cost the '\n\n' seperator plain.jinja puts before the
+        #      target; on the 8B it cost the whole llama-3 header block
+        #      (<|start_header_id|>user<|end_header_id|>, <|eot_id|>, and the
+        #      assistant header). so GCG and TAO were not attacking the same input.
+        #   2. tokenizing pieces seperately inserted a stray 29871, the
+        #      sentencepiece bare space token, at every boundary. " ! ! !" on its
+        #      own is [29871, 1738, 1738, 1738]; the same text inside the full
+        #      string is [1738, 1738, 1738]. two junk tokens per prompt.
+        #
+        # so go through prepare_conversation, the same function GCG uses, and take
+        # the slices from the segment lengths it hands back. that way TAO inherits
+        # whatever template the run is configured with instead of inventing a
+        # format, and it stays right if the template ever changes.
+        #
+        # NOTE this makes CHAT_TEMPLATE load-bearing for TAO, which it never was
+        # before. a TAO run with the wrong template is now as wrong as a GCG one.
+        #
+        # there is no EOS on the end, deliberately. plain.jinja emits one but
+        # prepare_conversation only uses it to locate the target by suffix probing;
+        # it falls outside the six segments, and the sequence GCG actually forwards
+        # stops at the last target token.
+        if self._n_goal_prompt is None:
+            # the prompt segment WITHOUT the suffix, so the boundary between the
+            # instruction and the optimisable region is known. depends only on the
+            # instruction, so it is worked out once per behavior and not per step
+            self._n_goal_prompt = len(self._segments(self.instruction)[2])
 
-        self._user_role_slice = slice(0, 0)
-        self._goal_slice = slice(0, len(instr_ids))
+        pre, attack_pre, prompt, attack_suf, post, target = self._segments(
+            self.instruction + " " + self.adv_string
+        )
+
+        n_pre = len(pre) + len(attack_pre)
+        goal_end = n_pre + self._n_goal_prompt
+        # attack_suf is empty on our templates (the suffix rides inside the user
+        # content) but it is counted anyway so this does not quietly break if
+        # AdversariaLLM starts marking it up
+        control_end = n_pre + len(prompt) + len(attack_suf)
+        target_start = control_end + len(post)
+        target_end = target_start + len(target)
+
+        self._user_role_slice = slice(0, n_pre)
+        self._goal_slice = slice(0, goal_end)
         # the only positions the attack is allowed to change
-        self._control_slice = slice(len(instr_ids), len(instr_ids) + len(adv_ids))
-        self._assistant_role_slice = slice(
-            len(instr_ids) + len(adv_ids), len(instr_ids) + len(adv_ids)
-        )
-        self._target_slice = slice(
-            len(instr_ids) + len(adv_ids),
-            len(instr_ids) + len(adv_ids) + len(target_ids),
-        )
+        self._control_slice = slice(goal_end, control_end)
+        # whatever the template puts between the prompt and the target. GCG calls
+        # this "post". not optimisable, not part of the loss
+        self._assistant_role_slice = slice(control_end, target_start)
+        self._target_slice = slice(target_start, target_end)
         # the loss slice is the target slice shifted back one, because position t
         # is what predicts token t+1
-        self._loss_slice = slice(
-            len(instr_ids) + len(adv_ids) - 1,
-            len(instr_ids) + len(adv_ids) + len(target_ids) - 1,
-        )
+        self._loss_slice = slice(target_start - 1, target_end - 1)
 
-        full_ids = instr_ids + adv_ids + target_ids
-        return full_ids
+        return torch.cat([pre, attack_pre, prompt, attack_suf, post, target]).tolist()
 
     def get_input_ids(self, adv_string=None):
         full_ids = self.get_prompt(adv_string=adv_string)
@@ -424,18 +472,72 @@ def get_filtered_cands(tokenizer, control_cand, curr_control=None):
     return cands
 
 
-def batch_forward(model, input_ids, attention_mask=None, batch_size=64):
-    """forward in chunks, because the whole candidate set at once wont fit."""
-    logits_list = []
+def _slice_loss(logits, ids, target_slice, n_target_toks=0):
+    """per candidate cross entropy over one target slice of one logits chunk.
+
+    n_target_toks skips a shared target prefix, which is what the negative side
+    wants when it shares its opening tokens with the positive.
+    """
+    ce_per_token = nn.CrossEntropyLoss(reduction="none")
+    loss_slice = slice(target_slice.start - 1 + n_target_toks, target_slice.stop - 1)
+    tgt_slice = slice(target_slice.start + n_target_toks, target_slice.stop)
+    return ce_per_token(
+        # transpose because CrossEntropyLoss wants [batch, classes, seq]
+        logits[:, loss_slice, :].transpose(1, 2),
+        ids[:, tgt_slice],
+    ).mean(dim=-1)
+
+
+# how many candidate sequences go through the model in ONE forward. this is the
+# only thing that sets the peak now that the losses are reduced per chunk, so it
+# is the dial to turn when a worker OOMs -- NOT TAO_BATCH_SIZE, which costs wall
+# clock and nothing else.
+#
+# dropped 64 -> 32 on 2026-09-04 after the first real launch OOMed. the 23.3 GB i
+# measured came from behavior 0, which is SHORT. plenty of harmbench behaviors
+# carry a ContextString paragraph, and a chunk of those is much wider: the shard
+# that died was asking for a single 2.08 GiB allocation. halving the chunk halves
+# that. costs very little because the per step cost is dominated by the fixed
+# backward, not by the candidate sweep (see the cost model in run_tao_full.sh).
+FORWARD_CHUNK = int(os.environ.get("TAO_FORWARD_CHUNK") or 32)
+
+
+def batch_forward_losses(model, input_ids, attention_mask, specs, batch_size=None):
+    """forward in chunks and reduce each chunk to its losses straight away.
+
+    the old version concatenated every chunk's logits and only then took the loss,
+    so it held a [n_candidates, seq_len, vocab] tensor. that is the biggest single
+    allocation in the attack and it grows linearly with TAO_BATCH_SIZE: at the
+    published batch of 512 its about 3 GB on the 7B and 13 GB on the 8B, whose
+    vocab is four times larger. thats what kept the sampling budget out of reach,
+    the model weights were never the problem.
+
+    reducing inside the loop leaves the peak depending on batch_size (the CHUNK,
+    64) alone, so TAO_BATCH_SIZE now costs wall clock and not memory.
+
+    specs is a list of (target_slice, n_target_toks). one sweep can score several
+    slices, which is what the share_prefix path needs -- it reads the positive and
+    the negative target out of the same sequences and used to be the reason we
+    kept the logits around at all.
+
+    no gc.collect() in here anymore. the logits are not part of a cycle so `del`
+    frees them immediately, and a full collection per chunk was costing more than
+    it ever saved. the step loop still collects after the whole sweep.
+    """
+    batch_size = batch_size or FORWARD_CHUNK
+    out = [[] for _ in specs]
     for i in range(0, input_ids.shape[0], batch_size):
-        batch = input_ids[i:i + batch_size]
+        ids = input_ids[i:i + batch_size]
         mask = attention_mask[i:i + batch_size] if attention_mask is not None else None
-        logits_list.append(model(input_ids=batch, attention_mask=mask).logits)
-        gc.collect()
-    return torch.cat(logits_list, dim=0)
+        logits = model(input_ids=ids, attention_mask=mask).logits
+        for j, (target_slice, n_target_toks) in enumerate(specs):
+            out[j].append(_slice_loss(logits, ids, target_slice, n_target_toks))
+        del logits
+    return [torch.cat(pieces) for pieces in out]
 
 
-def get_batch_logits(model, tokenizer, input_ids, control_slice, test_controls, batch_size=64):
+def get_batch_losses(model, tokenizer, input_ids, control_slice, test_controls,
+                     specs, batch_size=None):
     """scores a list of candidate suffix strings by pasting each one into the
     control slice of the same base sequence."""
     max_len = control_slice.stop - control_slice.start
@@ -461,35 +563,9 @@ def get_batch_logits(model, tokenizer, input_ids, control_slice, test_controls, 
         1, slot_positions, test_ids,
     )
     attn_mask = (ids != pad_tok).long()
-    logits = batch_forward(model, ids, attn_mask, batch_size)
-    del slot_positions, test_ids
-    gc.collect()
-    return logits, ids
-
-
-def target_loss_batch(logits, ids, target_slice, neg_loss=None, alpha=0.2, n_target_toks=0):
-    """per candidate loss over the target slice.
-
-    with neg_loss given its the combined TAO objective (target minus alpha times
-    negative). without it its a plain target loss, which is how the negative side
-    itself gets scored, and there n_target_toks skips the shared target prefix.
-    """
-    ce_per_token = nn.CrossEntropyLoss(reduction="none")
-    if neg_loss is not None:
-        loss_slice = slice(target_slice.start - 1, target_slice.stop - 1)
-        loss = ce_per_token(
-            # transpose because CrossEntropyLoss wants [batch, classes, seq]
-            logits[:, loss_slice, :].transpose(1, 2),
-            ids[:, target_slice],
-        ).mean(dim=-1)
-        loss -= alpha * neg_loss
-    else:
-        loss_slice = slice(target_slice.start - 1 + n_target_toks, target_slice.stop - 1)
-        loss = ce_per_token(
-            logits[:, loss_slice, :].transpose(1, 2),
-            ids[:, slice(target_slice.start + n_target_toks, target_slice.stop)],
-        ).mean(dim=-1)
-    return loss
+    losses = batch_forward_losses(model, ids, attn_mask, specs, batch_size)
+    del slot_positions, test_ids, ids, attn_mask
+    return losses
 
 
 def is_converged(loss_history, window_size=5, threshold=0.0015):
@@ -524,6 +600,22 @@ def load_model_and_tokenizer():
     model = AutoModelForCausalLM.from_pretrained(
         model_id, trust_remote_code=False, dtype=torch.bfloat16,
     ).to("cuda").eval()
+
+    # FREEZE THE PARAMETERS. .eval() only switches dropout and batchnorm, it does
+    # nothing to requires_grad, so every loss.backward() in token_gradients_tao was
+    # allocating and filling a .grad buffer for all 8 billion parameters -- a
+    # second full copy of the weights, on the card, that nothing ever reads. the
+    # attack only ever uses input_embeds.grad.
+    #
+    # thats the whole reason this thing looked like a 34-38 GB job. measured peak
+    # at batch 512 was 33.6 GB on the 7B and 37.7 GB on the 8B, and the weights are
+    # 13.5 and 16 GB, so almost exactly half of each peak was the dead gradient
+    # copy. freeing it is what lets more than two workers share the card.
+    #
+    # numerically this changes nothing: the gradient w.r.t. the input embeddings is
+    # the same whether or not autograd also accumulates into the parameters.
+    for p in model.parameters():
+        p.requires_grad_(False)
 
     if ATTACK_TARGET == "balcony":
         model = wrap_for_single_exit(model)
@@ -724,46 +816,39 @@ def run_tao_single(model, tokenizer, instruction, target, exit_layer,
             gc.collect()
             torch.cuda.empty_cache()
 
-            if stage == 0:
-                logits, ids = get_batch_logits(
+            # the two slices every path needs. the negative skips the target prefix
+            # it shares with the positive, the positive never does -- thats how the
+            # old target_loss_batch behaved too, its neg_loss branch ignored
+            # n_target_toks entirely
+            neg_spec = (neg_manager._target_slice, n_target_toks)
+            pos_spec = (suffix_manager._target_slice, 0)
+
+            if stage == 0 and share_prefix:
+                # the candidate sweep is the dominant cost of the whole attack
+                # (BATCH_SIZE forwards per step). the positive target tokens sit
+                # inside these same negative sequences, so one sweep scoring both
+                # slices is all thats needed
+                neg_losses, pos_losses = get_batch_losses(
                     model, tokenizer, neg_input_ids,
                     neg_manager._control_slice, new_suffixes,
-                    batch_size=64,
+                    specs=[neg_spec, pos_spec],
                 )
-                neg_losses = target_loss_batch(logits, ids, neg_manager._target_slice, n_target_toks=n_target_toks)
-                if share_prefix:
-                    # the candidate sweep is the dominant cost of the whole attack
-                    # (BATCH_SIZE forwards per step). the positive target tokens sit
-                    # inside these same negative sequences, so the second sweep the
-                    # previous version ran was recomputing logits we already had
-                    losses = target_loss_batch(
-                        logits, ids, suffix_manager._target_slice, neg_losses, ALPHA, n_target_toks
-                    )
-                    del logits, ids, neg_losses
-                else:
-                    logits2, ids2 = get_batch_logits(
-                        model, tokenizer, input_ids,
-                        suffix_manager._control_slice, new_suffixes,
-                        batch_size=64,
-                    )
-                    losses = target_loss_batch(logits2, ids2, suffix_manager._target_slice, neg_losses, ALPHA, n_target_toks)
-                    del logits, ids, neg_losses, logits2, ids2
             else:
-                # stage 1: the negative is the model's own completion, which shares
-                # no prefix with the positive, so both sweeps have to be run
-                logits, ids = get_batch_logits(
+                # stage 1, and stage 0 without a shared prefix: the positive and the
+                # negative live in different sequences, so both have to be swept
+                (neg_losses,) = get_batch_losses(
+                    model, tokenizer, neg_input_ids,
+                    neg_manager._control_slice, new_suffixes,
+                    specs=[neg_spec],
+                )
+                (pos_losses,) = get_batch_losses(
                     model, tokenizer, input_ids,
                     suffix_manager._control_slice, new_suffixes,
-                    batch_size=64,
+                    specs=[pos_spec],
                 )
-                neg_logits, neg_ids = get_batch_logits(
-                    model, tokenizer, neg_input_ids,
-                    neg_manager._control_slice, new_suffixes,
-                    batch_size=64,
-                )
-                neg_losses = target_loss_batch(neg_logits, neg_ids, neg_manager._target_slice, n_target_toks=n_target_toks)
-                losses = target_loss_batch(logits, ids, suffix_manager._target_slice, neg_losses, ALPHA)
-                del logits, ids, neg_logits, neg_ids, neg_losses
+
+            losses = pos_losses - ALPHA * neg_losses
+            del neg_losses, pos_losses
 
             gc.collect()
             torch.cuda.empty_cache()
@@ -913,8 +998,16 @@ def main():
     print("Loading model + tokenizer...", flush=True)
     model, tok = load_model_and_tokenizer()
 
-    dataset = load_benchmark(BENCHMARK, n_behaviors=N_BEHAVIORS)
-    print(f"Loaded {len(dataset)} behaviors", flush=True)
+    # loaded up to BEHAVIOR_END and then iterated from BEHAVIOR_START, so the
+    # indices this process writes are the global ones. loading only the slice
+    # would restart the numbering at 0 and two shards would collide on
+    # behavior_idx when merge_tao_shards folds them together.
+    dataset = load_benchmark(BENCHMARK, n_behaviors=BEHAVIOR_END)
+    print(
+        f"Loaded {len(dataset)} behaviors, attacking "
+        f"[{BEHAVIOR_START}, {len(dataset)})",
+        flush=True,
+    )
 
     # TAO uses the ascii filter rather than AdversariaLLM's disallowed id list,
     # same as the reference implementation does
@@ -925,7 +1018,7 @@ def main():
         print(f"\n=== TAO attack on exit {exit_layer} ===", flush=True)
         per_behavior = all_results.setdefault(str(exit_layer), [])
         already_done = {r["behavior_idx"] for r in per_behavior}
-        for i in range(len(dataset)):
+        for i in range(BEHAVIOR_START, len(dataset)):
             if i in already_done:
                 print(f"  behavior [{i}] already in checkpoint, skipping", flush=True)
                 continue
@@ -943,10 +1036,41 @@ def main():
             random.seed(42)
 
             t0 = time.time()
-            result = run_tao_single(
-                model, tok, instruction, target, exit_layer,
-                not_allowed_tokens,
-            )
+            # one bad behavior must not cost the whole shard. before this, an
+            # exception anywhere in run_tao_single killed the process and every
+            # behavior after it was simply never attempted -- on a shared cluster
+            # queue thats a job you paid for and got nothing back from.
+            #
+            # the failure is RECORDED rather than swallowed: a stub result with
+            # error set, so it shows up in the merged json and in the counts
+            # instead of looking like a behavior that was never queued. an OOM is
+            # re-raised though, because that one is not behavior specific -- if
+            # the card is full then behavior i+1 will die the same way, and
+            # failing fast lets the scheduler requeue the whole task somewhere
+            # with more memory.
+            try:
+                result = run_tao_single(
+                    model, tok, instruction, target, exit_layer,
+                    not_allowed_tokens,
+                )
+            except torch.OutOfMemoryError:
+                raise
+            except Exception as exc:
+                print(f"  [{i}] FAILED: {type(exc).__name__}: {exc}", flush=True)
+                import traceback
+                traceback.print_exc()
+                result = {
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "final_loss": None,
+                    "final_suffix": None,
+                    "final_stage": None,
+                    "own_exit_completion": None,
+                    "loss_curve": [],
+                }
+                # the allocator can be left holding the failed behavior's tensors,
+                # which would then push the NEXT one over the edge
+                gc.collect()
+                torch.cuda.empty_cache()
             elapsed = time.time() - t0
 
             result["behavior_idx"] = i
@@ -971,9 +1095,17 @@ def main():
     print(f"{'exit':>6} | {'mean loss':>12} | {'mean stage':>12}")
     for exit_layer in attacked_exits():
         behaviors = all_results[str(exit_layer)]
-        mean_loss = sum(b["final_loss"] for b in behaviors) / len(behaviors)
-        mean_stage = sum(b["final_stage"] for b in behaviors) / len(behaviors)
-        print(f"{str(exit_layer):>6} | {mean_loss:12.4f} | {mean_stage:12.1f}")
+        # failed behaviors carry final_loss=None now, and averaging over them
+        # would either crash or quietly drag the mean. count them out loud
+        ok = [b for b in behaviors if b.get("final_loss") is not None]
+        n_failed = len(behaviors) - len(ok)
+        if not ok:
+            print(f"{str(exit_layer):>6} | {'no results':>12} | {'':>12}  ({n_failed} FAILED)")
+            continue
+        mean_loss = sum(b["final_loss"] for b in ok) / len(ok)
+        mean_stage = sum(b["final_stage"] for b in ok) / len(ok)
+        note = f"  ({n_failed} FAILED)" if n_failed else ""
+        print(f"{str(exit_layer):>6} | {mean_loss:12.4f} | {mean_stage:12.1f}{note}")
 
 
 if __name__ == "__main__":

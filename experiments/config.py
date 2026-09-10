@@ -27,6 +27,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # the attack scripts call this one ROOT.
 ROOT = str(PROJECT_ROOT / "AdversariaLLM")
 
+# where the behaviour csvs and target jsons live. defaults to ROOT, which is where
+# they sit in a normal checkout, so nothing changes here. it is seperate from ROOT
+# because the portable cluster bundle ships the four data files WITHOUT shipping a
+# whole AdversariaLLM tree, and then the data is next to the code instead of
+# under AdversariaLLM/ (see scripts/make_cluster_bundle.sh).
+DATA_ROOT = os.environ.get("DATA_ROOT") or ROOT
+
 
 def _env_str(name, default):
     raw = os.environ.get(name)
@@ -91,6 +98,21 @@ FIG_DIR = RESULTS_DIR / "figures"
 
 N_BEHAVIORS = _env_int("N_BEHAVIORS", 50)
 NUM_STEPS = _env_int("NUM_STEPS", 150)
+
+# which SLICE of the benchmark this process attacks, as a half open [start, end).
+# the parallel queue shards by behavior range now and not just by exit, because at
+# 500 steps one 50 behavior shard is over two days and a pool whose smallest unit
+# is two days spends its whole tail with one worker running alone.
+#
+# behavior_idx stays the GLOBAL index either way (behavior_datasets truncates from
+# the front with iloc[:n], so behavior 37 is the same behavior no matter what the
+# slice is), which is what lets merge_tao_shards fold the pieces back together
+# without knowing shards exist. it already dedupes on behavior_idx.
+#
+# defaults to the whole [0, N_BEHAVIORS) run, so every existing script that never
+# sets these behaves exactly as it did before.
+BEHAVIOR_START = _env_int("BEHAVIOR_START", 0)
+BEHAVIOR_END = _env_int("BEHAVIOR_END", N_BEHAVIORS)
 
 # how long the completions we hand to the judge are allowed to be. harmbench
 # mandates 512 ("We use max_new_tokens=512 for all experiments",
@@ -244,8 +266,8 @@ def ensure_chat_template(tokenizer):
 
 # --- benchmark data -------------------------------------------------------
 
-HARMBENCH_MESSAGES = f"{ROOT}/data/behavior_datasets/harmbench_behaviors_text_all.csv"
-HARMBENCH_TARGETS = f"{ROOT}/data/optimizer_targets/harmbench_targets_text.json"
+HARMBENCH_MESSAGES = f"{DATA_ROOT}/data/behavior_datasets/harmbench_behaviors_text_all.csv"
+HARMBENCH_TARGETS = f"{DATA_ROOT}/data/optimizer_targets/harmbench_targets_text.json"
 
 
 def describe():

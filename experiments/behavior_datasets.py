@@ -9,7 +9,7 @@
 
 import pandas as pd
 
-from config import ROOT
+from config import DATA_ROOT as ROOT
 
 # name goes to (behaviors csv, optimizer targets json)
 BENCHMARKS = {

@@ -42,6 +42,12 @@ EXPECTED_EXITS = {
     "results": ["4", "8", "12", "full"],
     "results_7b": ["15", "18", "21", "full"],
     "results_8b": ["15", "18", "21", "full"],
+    # the full budget rerun (run_tao_full.sh, 500 steps / batch 512). deliberately
+    # a seperate dir from results_7b/results_8b: those hold 150 step results and
+    # merging the two would put two attack budgets under one ASR without anything
+    # downstream being able to tell
+    "results_7b_tao500": ["15", "18", "21", "full"],
+    "results_8b_tao500": ["15", "18", "21", "full"],
 }
 
 
