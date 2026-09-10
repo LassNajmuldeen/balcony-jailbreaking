@@ -1,0 +1,30 @@
+\begin{table}[t]
+\centering
+\caption{Utility on six multiple choice benchmarks with no attack, for every exit of each model together with the full model and the separate no-balcony baseline. Scores are accuracy from lm-eval-harness (acc\_norm for HellaSwag, ARC and PIQA, acc for WinoGrande and MMLU). The full exit and the no-balcony baseline share trunk weights, so their scores match.}
+\label{tab:utility_clean}
+\small
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{ll cccccc}
+\toprule
+\textbf{Model} & \textbf{Exit} & HellaSwag & ARC-C & ARC-E & WinoGrande & PIQA & MMLU \\
+\midrule
+\multirow{5}{*}{1B} & Exit 4 & 0.333 & 0.237 & 0.454 & 0.520 & 0.641 & 0.245 \\
+ & Exit 8 & 0.417 & 0.281 & 0.527 & 0.523 & 0.690 & 0.252 \\
+ & Exit 12 & 0.546 & 0.336 & 0.615 & 0.568 & 0.723 & 0.249 \\
+ & Full (16) & 0.612 & 0.387 & 0.690 & 0.592 & 0.747 & 0.256 \\
+ & No-Balcony & 0.612 & 0.387 & 0.690 & 0.592 & 0.747 & 0.256 \\
+\midrule
+\multirow{5}{*}{7B} & Exit 15 & 0.630 & 0.347 & 0.617 & 0.636 & 0.742 & 0.369 \\
+ & Exit 18 & 0.684 & 0.388 & 0.662 & 0.650 & 0.760 & 0.395 \\
+ & Exit 21 & 0.715 & 0.414 & 0.683 & 0.670 & 0.766 & 0.400 \\
+ & Full (32) & 0.760 & 0.451 & 0.739 & 0.691 & 0.787 & 0.409 \\
+ & No-Balcony & 0.760 & 0.451 & 0.739 & 0.691 & 0.787 & 0.409 \\
+\midrule
+\multirow{5}{*}{8B} & Exit 15 & 0.519 & 0.334 & 0.476 & 0.658 & 0.634 & 0.310 \\
+ & Exit 18 & 0.581 & 0.386 & 0.573 & 0.684 & 0.669 & 0.614 \\
+ & Exit 21 & 0.635 & 0.429 & 0.611 & 0.697 & 0.695 & 0.626 \\
+ & Full (32) & 0.792 & 0.540 & 0.777 & 0.734 & 0.806 & 0.621 \\
+ & No-Balcony & 0.792 & 0.540 & 0.777 & 0.734 & 0.806 & 0.621 \\
+\bottomrule
+\end{tabular}}
+\end{table}

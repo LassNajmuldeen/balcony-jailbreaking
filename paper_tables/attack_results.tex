@@ -1,0 +1,30 @@
+\begin{table}[t]
+\centering
+\caption{GCG attack results on both benchmarks. Final loss is the mean cross entropy GCG minimizes over 50 behaviors after 150 steps. ASR is the share of those behaviors the HarmBench judge scores above 0.5. Each model is listed for every exit, the full model, and its no-balcony baseline.}
+\label{tab:attack_results}
+\small
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{ll cccc}
+\toprule
+\textbf{Model} & \textbf{Exit} & HB Loss & HB ASR\% & AB Loss & AB ASR\% \\
+\midrule
+\multirow{5}{*}{1B} & Exit 4 & 0.691 & 26.0 & 0.487 & 26.0 \\
+ & Exit 8 & 0.562 & 18.0 & 0.440 & 32.0 \\
+ & Exit 12 & 0.376 & 72.0 & 0.315 & 62.0 \\
+ & Full (16) & 0.253 & 58.0 & 0.257 & 68.0 \\
+ & No-Balcony & 0.259 & 62.0 & 0.261 & 74.0 \\
+\midrule
+\multirow{5}{*}{7B} & Exit 15 & 0.605 & 24.0 & 0.681 & 30.0 \\
+ & Exit 18 & 0.543 & 28.0 & 0.672 & 36.0 \\
+ & Exit 21 & 0.517 & 26.0 & 0.644 & 34.0 \\
+ & Full (32) & 0.427 & 38.0 & 0.491 & 34.0 \\
+ & No-Balcony & 0.452 & 32.0 & 0.600 & 22.0 \\
+\midrule
+\multirow{5}{*}{8B} & Exit 15 & 1.904 & 4.0 & 1.530 & 2.0 \\
+ & Exit 18 & 1.203 & 12.0 & 1.021 & 0.0 \\
+ & Exit 21 & 1.057 & 12.0 & 0.906 & 12.0 \\
+ & Full (32) & 0.501 & 28.0 & 0.521 & 28.0 \\
+ & No-Balcony & 0.507 & 28.0 & 0.522 & 28.0 \\
+\bottomrule
+\end{tabular}}
+\end{table}
