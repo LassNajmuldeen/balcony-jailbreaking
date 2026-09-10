@@ -1,13 +1,17 @@
 # ---------------------------------------------------------------------------
-# What this repo tracks: source only -- the adapter and the experiment scripts
-# under experiments/, plus README.md and RESULTS.md.
+# What this repo tracks: everything needed to rebuild this project on a fresh
+# machine -- the adapter, the experiment scripts, the orchestration drivers in
+# scripts/, the AdversariaLLM patches, the chat templates, SETUP.md, the paper
+# assets and the working notes.
 #
-# Everything else is derived, machine-local, or a working artefact: results,
-# figures, exports, logs, orchestration shell scripts, notes. All of it
-# regenerates from a run, so it is excluded here rather than committed.
+# What it does not track: raw run data. results/, run_logs/ and the run-state
+# markers are gigabytes of per-shard output that only mean anything on the
+# machine that produced them. The reported numbers live in RESULTS.md, the loss
+# curves in `local-notes/csv/`, and the rendered figures in paper_figures/.
 #
 # The three dependency repos (Balcony-LLaMA, TAO-Attack, AdversariaLLM) are git
-# SUBMODULES pinned by commit -- see .gitmodules.
+# SUBMODULES pinned by commit -- see .gitmodules. AdversariaLLM needs the two
+# patches in patches/ applied on top of its pinned commit; nothing else does.
 # ---------------------------------------------------------------------------
 
 # ---- python -------------------------------------------------------------
@@ -39,52 +43,25 @@ Thumbs.db
 *.swp
 *.swo
 
-# ---- experiment outputs --------------------------------------------------
-# Raw run data and everything rendered from it. The reported numbers live in
-# RESULTS.md; anyone else regenerates these by running the experiments.
+# ---- raw experiment output -----------------------------------------------
+# Per-behaviour attack records, completions and judge scores. Tens of megabytes
+# per arm and reproducible only by re-running the attack on a GPU. The numbers
+# that came out of these are written up in RESULTS.md.
 results/
 results_*/
-paper_figures/
-paper_tables/
-*.json
-
-# ...but the model adapter's own config files are source, not output.
-!adapter/**/*.json
 
 # ---- run bookkeeping -----------------------------------------------------
-# Per-shard logs and the .done/.failed/.running/.skipped state markers used for
+# Per-shard logs and the .done/.failed/.running/.skipped markers used for
 # resume. Machine-local by definition.
 run_logs/
 run_state/
+run_state_*/
 *.log
+*.log.attempt[0-9]
 
-# ---- orchestration scripts -----------------------------------------------
-# Machine- and run-specific drivers, plus a number of one-off scheduling
-# interventions. Not program code, and not reusable as-is on another machine.
-scripts/
-
-# ---- local working files -------------------------------------------------
-# Notes, setup log, chat templates and the AdversariaLLM patch set: all specific
-# to how this particular machine was brought up.
-local-notes/
-SETUP.md
-patches/
-chat_templates/
-
-# ---- experiment scripts that are not part of the published pipeline -------
-# Kept on disk for provenance, excluded from the repo. Either superseded
-# scaffolding (the phase-1 smoke test, the settled 256-vs-512 length control and
-# its regeneration pass) or asset generators whose outputs already live in
-# RESULTS.md and the paper.
-experiments/smoke_test_gcg.py
-experiments/compare_256_512.py
-experiments/regen_completions.py
-experiments/visualize_results.py
-experiments/export_results.py
-experiments/export_paper_csv.py
-experiments/export_loss_curves.py
-experiments/make_paper_assets.py
-experiments/depth_artifact/
+# ---- build artefacts -----------------------------------------------------
+# Rebuild with scripts/make_cluster_bundle.sh.
+tao_cluster_bundle.tar.gz
 
 # ---- scratch, backups, superseded archives -------------------------------
 .edit_backups/
@@ -92,3 +69,10 @@ archive_tao_prefix_*/
 *.bak
 *.bak-*
 *.attempt[0-9]
+
+# ---- json ----------------------------------------------------------------
+# Most .json here is run output. The exceptions are source: the adapter's model
+# config, and the four small tables the depth figure is rebuilt from.
+*.json
+!adapter/**/*.json
+!experiments/depth_artifact/*.json

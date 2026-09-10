@@ -1,0 +1,43 @@
+{#-
+  "plain" -- the shipped llama-2-chat template with the [INST]/[/INST]/<<SYS>>
+  turn markers removed and NOTHING else changed. Built 2026-08-11 for the 7B
+  template test (run_7b_notemplate.sh).
+
+  Renders:   <s>{prompt}\n\n{target}</s>
+  vs shipped:<s>[INST] {prompt} [/INST] {target} </s>
+
+  Two things are load-bearing and were found empirically -- do not "simplify":
+
+  1. The trailing {{ eos_token }} is REQUIRED. AdversariaLLM's
+     prepare_conversation() locates the target segment by common-suffix probing;
+     with no EOS it returns target_tokens of length 0, GCG then optimises against
+     an empty target, and the run is silently meaningless. Verified:
+         no eos  -> segs [1, 0, 10, 0, 0, 0]   target DROPPED
+         w/ eos  -> segs [1, 0, 10, 0, 2, 7]   target = "Sure, here is a tutorial"
+
+  2. The separator must be '\n\n' emitted as an expression, not a literal
+     newline in the template body (jinja trims those) and not a space. A single
+     space makes the segmenter swallow "Sure," into the post segment:
+         ' '     -> post="Sure,"  target="here is a tutorial "   WRONG
+         '\n\n'  -> post="\n\n"   target="Sure, here is a tutorial"  right
+-#}
+{%- if messages[0]['role'] == 'system' -%}
+{%- set loop_messages = messages[1:] -%}
+{%- set system_message = messages[0]['content'] -%}
+{%- else -%}
+{%- set loop_messages = messages -%}
+{%- set system_message = false -%}
+{%- endif -%}
+{%- for message in loop_messages -%}
+{%- if loop.index0 == 0 and system_message != false -%}
+{%- set content = system_message + '\n\n' + message['content'] -%}
+{%- else -%}
+{%- set content = message['content'] -%}
+{%- endif -%}
+{%- if message['role'] == 'user' -%}
+{{ bos_token + content.strip() + '\n\n' }}
+{%- elif message['role'] == 'assistant' -%}
+{{ content.strip() + eos_token }}
+{%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt -%}{{ '' }}{%- endif -%}

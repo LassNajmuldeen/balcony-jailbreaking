@@ -1,0 +1,66 @@
+diff --git a/adversariallm/attacks/gcg.py b/adversariallm/attacks/gcg.py
+index 4485df7..c0942a5 100644
+--- a/adversariallm/attacks/gcg.py
++++ b/adversariallm/attacks/gcg.py
+@@ -371,7 +371,18 @@ class GCGAttack(Attack):
+                 {"role": "user", "content": conversation[0]["content"] + attack},
+                 {"role": "assistant", "content": ""},
+             ]
+-            tokens = prepare_conversation(tokenizer, conversation, attack_conversation)[0]
++            try:
++                tokens = prepare_conversation(tokenizer, conversation, attack_conversation)[0]
++            except TokenMergeError:
++                # Same failure mode _attack_single_conversation guards at l.291, but
++                # here on the *optimised* suffix: GCG is free to overwrite the leading
++                # space that guard inserted, letting the suffix merge back into the
++                # prompt's last token. Retry space-prefixed. Generation-only -- the
++                # loss curve in losses[] is already recorded, so this cannot move any
++                # reported number, it only rescues runs that would otherwise crash
++                # after all num_steps of compute.
++                attack_conversation[0]["content"] = conversation[0]["content"] + " " + attack
++                tokens = prepare_conversation(tokenizer, conversation, attack_conversation)[0]
+             token_list.append(torch.cat(tokens[:5]))
+             attack_conversations.append(attack_conversation)
+         batch_completions = generate_ragged_batched(
+@@ -444,13 +455,34 @@ class GCGAttack(Attack):
+                 # the entire prompt, not just the attack sequence in an isolated
+                 # way. This is because the prompt and attack can affect each
+                 # other's tokenization in some cases.
+-                idx = filter_suffix(
+-                    tokenizer,
+-                    conversation,
+-                    [[None, sampled_ids.cpu()]],
+-                )
+-                sampled_ids = sampled_ids[idx]
+-                sampled_ids_pos = sampled_ids_pos[idx]
++                try:
++                    idx = filter_suffix(
++                        tokenizer,
++                        conversation,
++                        [[None, sampled_ids.cpu()]],
++                    )
++                    sampled_ids = sampled_ids[idx]
++                    sampled_ids_pos = sampled_ids_pos[idx]
++                except RuntimeError:
++                    # LOCAL PATCH (see SETUP.md 4d).
++                    # Once the optimised suffix drifts into tokens whose
++                    # decode->encode is unstable, EVERY candidate at a step can
++                    # fail the round-trip check and filter_suffix raises, killing
++                    # a multi-hour run outright. Seen on Llama-2's SentencePiece
++                    # tokenizer ~30 min into a 7B run.
++                    #
++                    # Fall back to the unfiltered candidates for this step only,
++                    # rather than setting filter_ids=False globally: filtering
++                    # still applies at every step where it works, so runs stay
++                    # comparable with each other and with the existing 1B results.
++                    self._filter_fallbacks = getattr(self, "_filter_fallbacks", 0) + 1
++                    if self._filter_fallbacks <= 5 or self._filter_fallbacks % 100 == 0:
++                        print(
++                            f"[gcg] filter_suffix rejected all {sampled_ids.shape[0]} candidates; "
++                            f"using them unfiltered for this step "
++                            f"(occurrence {self._filter_fallbacks})",
++                            flush=True,
++                        )
+ 
+             # Compute loss on candidates
+             compute_loss_fn = partial(self.compute_candidates_loss, model)
