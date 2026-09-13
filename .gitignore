@@ -2,12 +2,15 @@
 # What this repo tracks: everything needed to rebuild this project on a fresh
 # machine -- the adapter, the experiment scripts, the orchestration drivers in
 # scripts/, the AdversariaLLM patches, the chat templates, SETUP.md, the paper
-# assets and the working notes.
+# assets, the working notes, and (since 2026-09-13) the raw results.
 #
-# What it does not track: raw run data. results/, run_logs/ and the run-state
-# markers are gigabytes of per-shard output that only mean anything on the
-# machine that produced them. The reported numbers live in RESULTS.md, the loss
-# curves in `local-notes/csv/`, and the rendered figures in paper_figures/.
+# results/ and results_*/ are tracked now, the machine that made them is going
+# away and the paper figures and tables cant be rebuilt without them. its ~48MB
+# of json and png, no single file over 20MB. see the negation rules at the bottom.
+#
+# What it still does not track: run_logs/ (99MB of console output, nothing reads
+# it back) and the run-state markers, which only mean anything on the machine
+# that produced them.
 #
 # The three dependency repos (Balcony-LLaMA, TAO-Attack, AdversariaLLM) are git
 # SUBMODULES pinned by commit -- see .gitmodules. AdversariaLLM needs the two
@@ -43,13 +46,6 @@ Thumbs.db
 *.swp
 *.swo
 
-# ---- raw experiment output -----------------------------------------------
-# Per-behaviour attack records, completions and judge scores. Tens of megabytes
-# per arm and reproducible only by re-running the attack on a GPU. The numbers
-# that came out of these are written up in RESULTS.md.
-results/
-results_*/
-
 # ---- run bookkeeping -----------------------------------------------------
 # Per-shard logs and the .done/.failed/.running/.skipped markers used for
 # resume. Machine-local by definition.
@@ -76,3 +72,10 @@ archive_tao_prefix_*/
 *.json
 !adapter/**/*.json
 !experiments/depth_artifact/*.json
+
+# ---- raw results (tracked on purpose) ------------------------------------
+# per-behaviour attack records, completions, judge scores and the per-arm
+# figures. these come last so they win over *.json and *.bak-* above, the .bak
+# files are the pre-nanfix copies and worth keeping.
+!results/**
+!results_*/**
