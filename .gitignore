@@ -2,15 +2,15 @@
 # What this repo tracks: everything needed to rebuild this project on a fresh
 # machine -- the adapter, the experiment scripts, the orchestration drivers in
 # scripts/, the AdversariaLLM patches, the chat templates, SETUP.md, the paper
-# assets, the working notes, and (since 2026-09-13) the raw results.
+# assets and (since 2026-09-13) the raw results.
 #
 # results/ and results_*/ are tracked now, the machine that made them is going
 # away and the paper figures and tables cant be rebuilt without them. its ~48MB
 # of json and png, no single file over 20MB. see the negation rules at the bottom.
 #
 # What it still does not track: run_logs/ (99MB of console output, nothing reads
-# it back) and the run-state markers, which only mean anything on the machine
-# that produced them.
+# it back), the run-state markers, which only mean anything on the machine that
+# produced them, and local-notes/, which is my own notes and stays off github.
 #
 # The three dependency repos (Balcony-LLaMA, TAO-Attack, AdversariaLLM) are git
 # SUBMODULES pinned by commit -- see .gitmodules. AdversariaLLM needs the two
@@ -58,6 +58,11 @@ run_state_*/
 # ---- build artefacts -----------------------------------------------------
 # Rebuild with scripts/make_cluster_bundle.sh.
 tao_cluster_bundle.tar.gz
+
+# ---- my own notes --------------------------------------------------------
+# CLAUDE.md, ideas, handoff notes, the paper pdfs and the mentor csvs. local only,
+# never commit this. was tracked by mistake from 2026-09-10 to 2026-09-14.
+local-notes/
 
 # ---- scratch, backups, superseded archives -------------------------------
 .edit_backups/
