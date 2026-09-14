@@ -35,8 +35,9 @@ from config import RESULTS_DIR, N_BEHAVIORS  # noqa: E402
 
 # which exits each results dir is meant to contain. this is deliberately NOT
 # config.ALL_EXITS: run_tao_parallel.sh's merge loop only sets RESULTS_DIR, so
-# EXITS falls back to its "4 8 12 full" default and every 7B/8B group would be
-# called complete the moment four exits existed under the wrong names. keying off
+# EXITS falls back to its default ("15 18 21 full" now, "4 8 12 full" before
+# 2026-09-14) and whichever model doesnt match would be called complete the moment
+# four exits existed under the wrong names. keying off
 # the directory instead means the guard is right no matter how this gets invoked.
 EXPECTED_EXITS = {
     "results": ["4", "8", "12", "full"],

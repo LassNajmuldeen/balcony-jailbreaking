@@ -45,8 +45,11 @@ from config import (  # noqa: E402
     ROOT,
     SEARCH_WIDTH,
     TOPK,
-    BASELINE_MODEL as MODEL_ID,
+    require_baseline_model,
 )
+# this whole script is the seperate baseline arm, so no BASELINE_MODEL means
+# nothing to do. stops here instead of at from_pretrained(None)
+MODEL_ID = require_baseline_model()
 # whatever GCG starts its suffix off as ("x x x x ..."), pulled from the config
 # object rather than retyped, so the control uses the true step 0 string
 FILLER_SUFFIX = GCGConfig().optim_str_init

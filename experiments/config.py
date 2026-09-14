@@ -4,15 +4,19 @@
 # same constants, so moving the suite from 1B to 7B/8B is an env var change and
 # not an edit in ten files (SETUP.md 8.1).
 #
-# the defaults reproduce the original 1B runs exactly, so a script run with no env
-# vars set behaves the same as it did before i pulled all this out.
+# there are no 1B defaults anymore (2026-09-14). the 1B is out of scope and its
+# checkpoints, plus the stock baselines, got deleted from the HF cache, so a script
+# that quietly fell back to them would just redownload the wrong model. now
+# BALCONY_MODEL has to be set and there is no seperate baseline unless you ask.
 #
-# override per run, e.g.:
+# a normal run:
 #   BALCONY_MODEL=parsakaveh/Balcony-LLaMA2-7B \
-#   BASELINE_MODEL=meta-llama/Llama-2-7b-hf \
-#   EXITS="15 18 21 full" \
 #   RESULTS_DIR=results_7b \
-#     ./run_all.sh
+#     ./AdversariaLLM/.venv/bin/python experiments/<script>.py
+#
+# the old 1B setup needs all of it spelled out:
+#   BALCONY_MODEL=parsakaveh/Balcony-LLM-1B BASELINE_MODEL=parsakaveh/LLM-1B-Pretrained \
+#   EXITS="4 8 12 full" RESULTS_DIR=results
 
 import os
 import re
@@ -65,21 +69,46 @@ def _parse_exits(raw):
 
 # --- what we are attacking ------------------------------------------------
 
-# the balcony (early exit) checkpoint under attack
-BALCONY_MODEL = _env_str("BALCONY_MODEL", "parsakaveh/Balcony-LLM-1B")
+# the balcony (early exit) checkpoint under attack. no default on purpose. when the
+# env var is unset this name just isnt defined, so `from config import
+# BALCONY_MODEL` lands in __getattr__ at the bottom of this file and stops with a
+# message saying what to set. scripts that never load a model (judge, merge, the
+# figures) dont import it and keep working without it
+if os.environ.get("BALCONY_MODEL"):
+    BALCONY_MODEL = os.environ["BALCONY_MODEL"]
 
-# the weight matched, NON balcony control. its a seperate pretrained checkpoint,
-# NOT the 'full' exit. balcony freezes the backbone while training, so the stock
-# model is the correct no-early-exit control (SETUP.md 6).
-BASELINE_MODEL = _env_str("BASELINE_MODEL", "parsakaveh/LLM-1B-Pretrained")
+# the old weight matched, NON balcony control. OFF by default now. the trunk turned
+# out bitwise identical to the 'full' exit (291/291 tensors on 7B and 8B) so 'full'
+# IS the baseline, and the stock checkpoints are gone from the HF cache. only set
+# this to rerun an old no_balcony arm, and expect a 13 to 15G download when you do
+BASELINE_MODEL = os.environ.get("BASELINE_MODEL") or None
+
+
+def require_baseline_model():
+    """BASELINE_MODEL, or a clear stop when it isnt set.
+
+    for the code paths that only make sense with the seperate stock checkpoint.
+    without this they call from_pretrained(None) and die somewhere deep inside
+    transformers with an error that tells you nothing.
+    """
+    if not BASELINE_MODEL:
+        raise SystemExit(
+            "this needs the separate baseline checkpoint but BASELINE_MODEL is not set.\n"
+            "  'full' is the baseline now, so you most likely want to leave this arm out.\n"
+            "  to run it anyway set BASELINE_MODEL=NousResearch/Llama-2-7b-hf (7B) or\n"
+            "  BASELINE_MODEL=NousResearch/Meta-Llama-3-8B (8B), both redownload 13-15G."
+        )
+    return BASELINE_MODEL
+
 
 # the backbone layers the balcony heads hang off of, plus 'full' for the deepest
-# exit. 1B: [4, 8, 12, 'full'] (16 layers), 7B/8B: [15, 18, 21, 'full'] (32 layers)
-EXITS = _parse_exits(_env_str("EXITS", "4 8 12 full"))
+# exit. defaults to the 7B/8B layout since those are the only models in scope.
+# 1B was [4, 8, 12, 'full'] (16 layers), 7B/8B are [15, 18, 21, 'full'] (32 layers)
+EXITS = _parse_exits(_env_str("EXITS", "15 18 21 full"))
 
-# the utility evals also score the seperate baseline model, so they want the exits
-# plus that extra arm in one list
-ALL_EXITS = ["no_balcony"] + EXITS
+# the exits plus the no_balcony arm, but that arm is only in here when a baseline
+# model was actually asked for. otherwise the utility evals would go and load it
+ALL_EXITS = (["no_balcony"] if BASELINE_MODEL else []) + EXITS
 
 # --- where results go -----------------------------------------------------
 
@@ -274,7 +303,19 @@ def describe():
     """one line banner so every log actually says what it was run against. worth
     the two lines of code, i have lost hours to logs that didnt."""
     return (
-        f"balcony={BALCONY_MODEL} baseline={BASELINE_MODEL} "
+        f"balcony={globals().get('BALCONY_MODEL', 'unset')} baseline={BASELINE_MODEL} "
         f"exits={EXITS} results={RESULTS_DIR} "
         f"n_behaviors={N_BEHAVIORS} steps={NUM_STEPS}"
     )
+
+
+def __getattr__(name):
+    # python only calls this for names the module doesnt define, so in practice it
+    # only fires for BALCONY_MODEL when the env var was left unset (see the top)
+    if name == "BALCONY_MODEL":
+        raise ImportError(
+            "BALCONY_MODEL is not set and there is no default anymore. e.g.\n"
+            "  BALCONY_MODEL=parsakaveh/Balcony-LLaMA2-7B RESULTS_DIR=results_7b\n"
+            "  BALCONY_MODEL=adpretko/Balcony-Meta-LLaMA3-8B-exit-15-18-21 RESULTS_DIR=results_8b"
+        )
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

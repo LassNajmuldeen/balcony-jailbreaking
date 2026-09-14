@@ -17,9 +17,13 @@ from matplotlib.colors import LinearSegmentedColormap
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-# ALL_EXITS is the exit list with the no-balcony baseline prepended, which is
-# exactly what the figures that show the baseline need
-from config import EXITS, FIG_DIR, RESULTS_DIR, ALL_EXITS as ALL_MODELS  # noqa: E402
+from config import EXITS, FIG_DIR, RESULTS_DIR  # noqa: E402
+
+# the exit list with the no-balcony baseline prepended, which is exactly what the
+# figures that show the baseline need. built here on purpose and not taken from
+# config.ALL_EXITS, that one only has the baseline when BASELINE_MODEL is set, and
+# this script never loads a model, it plots whatever arms are already on disk
+ALL_MODELS = ["no_balcony"] + EXITS
 
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 # built from EXITS rather than hardcoded, so the same code covers the 1B labels

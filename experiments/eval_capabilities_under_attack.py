@@ -50,6 +50,7 @@ from config import (  # noqa: E402
     result_filename,
     BALCONY_MODEL as BALCONY_ID,
     BASELINE_MODEL as BASELINE_ID,
+    require_baseline_model,
 )
 
 DEFAULT_TASKS = ["hellaswag", "arc_challenge", "arc_easy", "mmlu", "winogrande", "piqa"]
@@ -150,6 +151,9 @@ def load_balcony_model():
 
 
 def load_baseline_model():
+    # only reachable when no_balcony was asked for by hand (--exits no_balcony),
+    # and without a BASELINE_MODEL that stops here with a clear message
+    require_baseline_model()
     tokenizer = AutoTokenizer.from_pretrained(BASELINE_ID, trust_remote_code=False)
     tokenizer = ensure_chat_template(tokenizer)
     if not tokenizer.pad_token:

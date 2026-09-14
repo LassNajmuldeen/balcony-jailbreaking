@@ -52,7 +52,7 @@ from config import (  # noqa: E402
     BEHAVIOR_START,
     BEHAVIOR_END,
     BENCHMARK,
-    BASELINE_MODEL,
+    require_baseline_model,
     result_filename,
     ensure_chat_template,
     EXITS,
@@ -582,7 +582,7 @@ def is_converged(loss_history, window_size=5, threshold=0.0015):
 def attacked_model_id():
     """which checkpoint this run attacks: the balcony model, or the seperate
     weight matched baseline when ATTACK_TARGET=baseline."""
-    return MODEL_ID if ATTACK_TARGET == "balcony" else BASELINE_MODEL
+    return MODEL_ID if ATTACK_TARGET == "balcony" else require_baseline_model()
 
 
 def attacked_exits():

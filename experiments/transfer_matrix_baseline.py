@@ -30,8 +30,11 @@ from config import (  # noqa: E402
     RESULTS_DIR,
     ROOT,
     BALCONY_MODEL as BALCONY_ID,
-    BASELINE_MODEL as BASELINE_ID,
+    require_baseline_model,
 )
+# every part of this script touches the baseline checkpoint, so stop right away
+# if there isnt one instead of after the attack files are loaded
+BASELINE_ID = require_baseline_model()
 
 # same keyword list as the attack scripts. recorded per entry but not used as a
 # metric anywhere, judge_harmfulness.py scores these completions properly later
