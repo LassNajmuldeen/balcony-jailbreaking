@@ -15,9 +15,9 @@ _REPO = Path(__file__).resolve().parent.parent
 
 # same env override as export_paper_csv.py, so this can be pointed at a rerun
 MODELS = [
-    ("1B", os.environ.get("RESULTS_DIR_1B") or "results"),
-    ("7B", os.environ.get("RESULTS_DIR_7B") or "results_7b"),
-    ("8B", os.environ.get("RESULTS_DIR_8B") or "results_8b"),
+    ("1B", os.environ.get("RESULTS_DIR_1B") or "results/archive/1b"),
+    ("7B", os.environ.get("RESULTS_DIR_7B") or "results/archive/7b"),
+    ("8B", os.environ.get("RESULTS_DIR_8B") or "results/archive/8b"),
 ]
 
 

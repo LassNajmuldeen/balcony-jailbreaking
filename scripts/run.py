@@ -50,7 +50,7 @@ def parser():
                      default=["harmbench", "advbench"])
     run.add_argument("--target", choices=("balcony", "baseline"), default="balcony")
     run.add_argument("--baseline-model", help="opt in to a separate baseline checkpoint")
-    run.add_argument("--results-dir", help="output directory (default: runs/<model>)")
+    run.add_argument("--results-dir", help="output directory (default: results/runs/<model>)")
     run.add_argument("--exits", nargs="+", help="subset of the model's exits, including full")
     run.add_argument("--plain", action="store_true", help="use the template-free prompt format")
     run.add_argument("--n-behaviors", type=positive, default=50)
@@ -63,7 +63,7 @@ def parser():
     run.add_argument("--tao-alpha", type=float, default=0.2)
     run.add_argument("--tao-forward-chunk", type=positive, default=32)
     run.add_argument("--gpu-memory-fraction", type=float, default=0.0)
-    run.add_argument("--data-root", default=str(REPO / "AdversariaLLM"))
+    run.add_argument("--data-root", default=str(REPO / "third_party" / "adversariallm"))
     run.add_argument("--classifier", choices=("llama-2-13b", "mistral-7b"), default="llama-2-13b")
     run.add_argument("--resume", action="store_true", help="skip attack stages completed with the same settings")
     for name in ("figures", "export"):
@@ -72,6 +72,7 @@ def parser():
                          help="explicitly use superseded inputs, including 1B development runs")
         if name == "figures":
             sub.add_argument("--paper", type=Path, help="extract the published figures and tables from a local paper PDF")
+            sub.add_argument("--depth-explorer", action="store_true", help="rebuild the historical depth explorer (requires --archive)")
         else:
             sub.add_argument("--loss-curves", action="store_true", help="also export the corrected GCG curves")
     for sub in (run, *[commands.choices[n] for n in ("figures", "export")]):
@@ -88,6 +89,11 @@ def result_name(attack, target, benchmark):
 def plan(args):
     """Return (stage name, script, arguments, environment) in execution order."""
     if args.command == "figures":
+        if args.depth_explorer:
+            if not args.archive or args.paper:
+                raise ValueError("--depth-explorer requires --archive and cannot use --paper")
+            return [(f"depth-{name}", f"depth_artifact/{name}.py", [], {})
+                    for name in ("recompute", "util", "loss", "build_depth")]
         if args.paper and args.archive:
             raise ValueError("choose --paper or --archive")
         if args.paper:
@@ -118,13 +124,14 @@ def plan(args):
         raise ValueError("--gpu-memory-fraction must be between 0 and 1")
     if not math.isfinite(args.tao_alpha) or args.tao_alpha < 0:
         raise ValueError("--tao-alpha must be finite and nonnegative")
-    suffix = "-baseline" if args.target == "baseline" else ""
-    out = Path(args.results_dir or f"runs/{args.model}{suffix}")
+    suffix = "_baseline" if args.target == "baseline" else ""
+    out = Path(args.results_dir or f"results/runs/{args.model}{suffix}")
     out = (REPO / out).resolve()
     # Keep the published data intact. A fresh directory also isolates pilot runs.
-    if any(out == p.resolve() or p.resolve() in out.parents
-           for p in REPO.glob("results*")) or out == REPO:
-        raise ValueError("choose a new output directory, such as runs/7b; recorded results are read-only")
+    protected = [REPO / "results" / name for name in ("archive", "paper")]
+    if (out in (REPO, REPO / "results")
+            or any(out == p.resolve() or p.resolve() in out.parents for p in protected)):
+        raise ValueError("choose a new output directory, such as results/runs/7b; recorded results are read-only")
     env = {
         "BALCONY_MODEL": spec.checkpoint, "BASELINE_MODEL": args.baseline_model or "",
         "EXITS": " ".join(exits), "CHAT_TEMPLATE": "plain" if args.plain else spec.template,

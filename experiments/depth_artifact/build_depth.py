@@ -4,7 +4,7 @@ Recompute those inputs when the archived result sets change."""
 import json
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parents[2] / "results/generated/depth_explorer"
 asr = json.load(open(HERE / "asr.json"))
 util = json.load(open(HERE / "util.json"))
 loss = json.load(open(HERE / "loss.json"))
@@ -441,7 +441,7 @@ html = f"""<title>Balcony early exits under GCG: attack success, capability and 
   </section>
 
   <footer>
-    Recomputed from results/, results_7b/, results_8b/ &middot; judge: cais/HarmBench-Mistral-7b-val-cls
+    Recomputed from results/archive/1b/, results/archive/7b/, results/archive/8b/ &middot; judge: cais/HarmBench-Mistral-7b-val-cls
     &middot; every number derived from per-behaviour scores at build time
   </footer>
 </div>
@@ -711,7 +711,7 @@ html = f"""<title>Balcony early exits under GCG: attack success, capability and 
 </script>
 """
 
-out = HERE / "balcony-depth.html"
+out = HERE / "depth_explorer.html"
 out.write_text(html)
 print("wrote", out, len(html), "bytes")
 print("exit-vs-full:", HEAD)

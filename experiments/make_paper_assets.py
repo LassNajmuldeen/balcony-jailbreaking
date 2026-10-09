@@ -13,13 +13,13 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config import PROJECT_ROOT  # noqa: E402
+from config import PROJECT_ROOT, GENERATED_DIR  # noqa: E402
 import export_results as er  # noqa: E402
 
-FIG_DIR = PROJECT_ROOT / "paper_figures"
-TAB_DIR = PROJECT_ROOT / "paper_tables"
-FIG_DIR.mkdir(exist_ok=True)
-TAB_DIR.mkdir(exist_ok=True)
+FIG_DIR = GENERATED_DIR / "figures"
+TAB_DIR = GENERATED_DIR / "tables"
+FIG_DIR.mkdir(parents=True, exist_ok=True)
+TAB_DIR.mkdir(parents=True, exist_ok=True)
 
 MODELS = ["1b", "7b", "8b"]
 MODEL_TITLE = {"1b": "Balcony-1B", "7b": "Balcony-LLaMA2-7B", "8b": "Balcony-LLaMA3-8B"}
@@ -109,7 +109,7 @@ def _save(fig, name):
     for ext in ("pdf", "png"):
         fig.savefig(FIG_DIR / f"{name}.{ext}", dpi=200)
     plt.close(fig)
-    print(f"  paper_figures/{name}.{{pdf,png}}")
+    print(f"  results/generated/figures/{name}.{{pdf,png}}")
 
 
 # ------------------------------------------------------------------------ figures
@@ -362,7 +362,7 @@ FIG_BLOCK = r"""% ============================================================
 
 \begin{{figure}}[t]
 \centering
-\includegraphics[width={width}]{{paper_figures/{file}.pdf}}
+\includegraphics[width={width}]{{results/generated/figures/{file}.pdf}}
 \caption{{{caption}}}
 \label{{{label}}}
 \end{{figure}}
@@ -424,7 +424,7 @@ def write_snippet(tables):
         parts.append(TAB_BANNER.format(num=i, title=title))
         parts.append(tex + "\n")
     (TAB_DIR / "paper_snippet.tex").write_text("\n".join(parts))
-    print("  paper_tables/paper_snippet.tex  (all figure + table blocks)")
+    print("  results/generated/tables/paper_snippet.tex  (all figure + table blocks)")
 
 
 def main():
@@ -441,7 +441,7 @@ def main():
     t1 = table_utility_clean(clean_att)
     t2 = table_utility_attacked(clean_att)
     t3 = table_attack(look)
-    print("  paper_tables/{utility_clean,utility_attacked,attack_results}.tex")
+    print("  results/generated/tables/{utility_clean,utility_attacked,attack_results}.tex")
     # same order as the template this replaced: clean utility, attacked utility, attacks
     write_snippet([("Utility Benchmarks, No Attack", t1),
                    ("Utility Under Attack", t2),

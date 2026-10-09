@@ -8,7 +8,7 @@ from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
-sys.path.insert(0, str(_REPO / "AdversariaLLM"))
+sys.path.insert(0, str(_REPO / "third_party" / "adversariallm"))
 # this file's own directory too, otherwise `from config import ...` fails when the
 # script is launched from somewhere other than experiments/
 sys.path.insert(0, str(Path(__file__).resolve().parent))

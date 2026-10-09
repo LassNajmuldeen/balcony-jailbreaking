@@ -4,7 +4,7 @@ scripts/run.py experiment with a small behavior and step budget."""
 import sys
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
-sys.path.insert(0, str(_REPO / "AdversariaLLM"))
+sys.path.insert(0, str(_REPO / "third_party" / "adversariallm"))
 
 import torch
 import adapter.balcony_llama  # registers "nested_llama" locally

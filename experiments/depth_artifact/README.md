@@ -1,17 +1,15 @@
 # Depth explorer
 
-`balcony-depth.html` is a standalone view of the archived results, including
+`results/archive/depth_explorer/depth_explorer.html` is a standalone snapshot of
+the archived results, including
 attack success, utility, loss, and paired McNemar comparisons.
 
 Rebuild from the repository root:
 
 ```bash
-python3 experiments/depth_artifact/recompute.py
-python3 experiments/depth_artifact/util.py
-python3 experiments/depth_artifact/loss.py
-python3 experiments/depth_artifact/build_depth.py
+python3 scripts/run.py figures --archive --depth-explorer
 ```
 
-The first three scripts derive the four JSON inputs from `results*/`.
-The last assembles the HTML. This view uses the original result sets; the
-template-free 7B reruns are separate.
+The runner derives JSON inputs from `results/archive/` and assembles the HTML
+in `results/generated/depth_explorer/`, which stays local. This historical view
+uses the original result sets; the template-free 7B reruns are separate.

@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import PROJECT_ROOT, judge_label, result_filename  # noqa: E402
+from config import PROJECT_ROOT, GENERATED_DIR, judge_label, result_filename  # noqa: E402
 from models import MODELS as MODEL_PRESETS
 
 # results dir, exit list, backbone depth. relative depth (exit/num_layers) is what
@@ -156,7 +156,7 @@ def to_latex(rows):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", nargs="+", default=list(MODELS), choices=list(MODELS))
-    ap.add_argument("--outdir", default="paper_tables")
+    ap.add_argument("--outdir", default=str(GENERATED_DIR / "tables"))
     args = ap.parse_args()
 
     rows = collect(args.models)

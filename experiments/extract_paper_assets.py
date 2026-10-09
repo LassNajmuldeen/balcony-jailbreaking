@@ -37,7 +37,7 @@ def main():
 
     assets = []
     for kind, number, page, name, x, y, width, height in CROPS:
-        directory = REPO / ("paper_figures" if kind == "figure" else "paper_tables") / "published"
+        directory = REPO / "results" / "paper" / ("figures" if kind == "figure" else "tables")
         directory.mkdir(parents=True, exist_ok=True)
         prefix = directory / name
         subprocess.run([
@@ -56,7 +56,7 @@ def main():
         "render_dpi": 240,
         "assets": assets,
     }
-    (REPO / "paper_figures/published/source.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (REPO / "results/paper/source.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 if __name__ == "__main__":

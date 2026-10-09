@@ -2,7 +2,7 @@
 # at a longer max_new_tokens. no attack compute: the suffix is read off disk and
 # only generation is replayed.
 #
-# why: the completions in results*/ were generated at 256 (GCG, AdversariaLLM's
+# why: archived completions were generated at 256 (GCG, AdversariaLLM's
 # GCGConfig default) and 200 (TAO), while HarmBench mandates 512
 # ("We use max_new_tokens=512 for all experiments", docs/evaluation_pipeline.md).
 # 72-100% of stored GCG completions sit exactly at the 256 cap, i.e. the model was
@@ -26,8 +26,8 @@
 # cost. Both arms then come from one generation and differ ONLY in length, which is
 # the comparison we actually want. Judge both; do not judge the on-disk text.
 #
-#   ./AdversariaLLM/.venv/bin/python experiments/regen_completions.py --verify -n 5
-#   ./AdversariaLLM/.venv/bin/python experiments/regen_completions.py
+#   ./.venv/bin/python experiments/regen_completions.py --verify -n 5
+#   ./.venv/bin/python experiments/regen_completions.py
 #
 # writes <name>_512.json beside each input. never touches the originals.
 
@@ -39,7 +39,7 @@ from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
-sys.path.insert(0, str(_REPO / "AdversariaLLM"))
+sys.path.insert(0, str(_REPO / "third_party" / "adversariallm"))
 
 import torch
 

@@ -27,7 +27,7 @@ class RunnerTests(unittest.TestCase):
             "judge", "utility", "utility-gcg",
         ])
         self.assertTrue(all(j[3]["BASELINE_MODEL"] == "" for j in jobs))
-        self.assertTrue(all(Path(j[3]["RESULTS_DIR"]) == REPO / "runs/7b" for j in jobs))
+        self.assertTrue(all(Path(j[3]["RESULTS_DIR"]) == REPO / "results/runs/7b" for j in jobs))
 
     def test_baseline_requires_explicit_checkpoint(self):
         with self.assertRaisesRegex(ValueError, "requires --baseline-model"):
@@ -44,9 +44,31 @@ class RunnerTests(unittest.TestCase):
                 self.assertIn("advbench", argv)
 
     def test_recorded_data_is_protected(self):
-        for name in ("results", "results_7b", "results_8b/figures", "."):
+        for name in ("results", "results/archive", "results/archive/7b",
+                     "results/archive/8b/figures", "results/paper", "results/paper/figures", "."):
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "new output directory"):
                 runner.plan(self.args("--results-dir", name))
+
+    def test_new_outputs_stay_local_and_use_lowercase_names(self):
+        jobs = runner.plan(self.args("--target", "baseline", "--baseline-model", "org/model"))
+        self.assertEqual(Path(jobs[0][3]["RESULTS_DIR"]), REPO / "results/runs/7b_baseline")
+        result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=REPO,
+                                input="results/runs/7b/attacks.json\nresults/generated/tables/test.csv\n",
+                                capture_output=True, text=True, check=True)
+        self.assertEqual(len(result.stdout.splitlines()), 2)
+
+    def test_relocated_data_root_contains_benchmark_inputs(self):
+        env = runner.plan(self.args())[0][3]
+        root = Path(env["DATA_ROOT"])
+        self.assertEqual(root, REPO / "third_party/adversariallm")
+        self.assertTrue((root / "data/behavior_datasets/harmbench_behaviors_text_all.csv").is_file())
+
+    def test_symlinks_cannot_bypass_archive_protection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            link = Path(temp) / "archive"
+            link.symlink_to(REPO / "results/archive", target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "read-only"):
+                runner.plan(self.args("--results-dir", str(link / "7b")))
 
     def test_model_presets_and_plain_prompt(self):
         for model, exits in (("7b", "15 18 21 full"), ("8b", "15 18 21 full")):
@@ -80,6 +102,19 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(jobs[0][2], [str(Path("paper.pdf").resolve())])
         args.archive = True
         with self.assertRaisesRegex(ValueError, "choose --paper or --archive"):
+            runner.plan(args)
+
+    def test_depth_explorer_requires_archive_and_orders_its_inputs(self):
+        args = runner.parser().parse_args(["figures", "--depth-explorer"])
+        with self.assertRaisesRegex(ValueError, "requires --archive"):
+            runner.plan(args)
+        args.archive = True
+        self.assertEqual([job[1] for job in runner.plan(args)], [
+            "depth_artifact/recompute.py", "depth_artifact/util.py",
+            "depth_artifact/loss.py", "depth_artifact/build_depth.py",
+        ])
+        args.paper = Path("paper.pdf")
+        with self.assertRaisesRegex(ValueError, "cannot use --paper"):
             runner.plan(args)
 
     def test_attack_completeness_checks(self):

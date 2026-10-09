@@ -8,7 +8,7 @@ called from another directory.
 
 ```bash
 .venv/bin/python scripts/run.py experiment --model 7b
-.venv/bin/python scripts/run.py experiment --model 7b --stage gcg --plain --results-dir runs/7b-plain
+.venv/bin/python scripts/run.py experiment --model 7b --stage gcg --plain --results-dir results/runs/7b_plain
 ```
 
 | Stage | Work |
@@ -28,13 +28,13 @@ Model checkpoints are defined in `experiments/models.py`. Each preset uses its
 matching chat template; `--plain` selects template-free prompts. Keep those
 variants in separate output directories and use matching templates in comparisons.
 
-New runs go to `runs/<model>/`; use a new `--results-dir` for different settings.
+New runs go to `results/runs/<model>/`; use a new `--results-dir` for different settings.
 The runner stops on a failed stage and rejects incomplete attack outputs.
 `--resume` skips completed attack stages with matching settings; TAO also saves
 progress after each behavior. `--dry-run` prints commands without loading models.
 
 For a separate baseline, pass `--target baseline --baseline-model <checkpoint>`.
-Its default output directory is `runs/<model>-baseline/`.
+Its default output directory is `results/runs/<model>_baseline/`.
 Baseline verification also requires `--baseline-model`.
 
 ## Experimental TAO
@@ -51,7 +51,7 @@ Extract the paper figures and tables with Poppler installed:
 python3 scripts/run.py figures --paper /path/to/paper.pdf
 ```
 
-Crops go to `paper_figures/published/` and `paper_tables/published/`.
+Crops go to `results/paper/figures/` and `results/paper/tables/`.
 The PDF remains local; the source manifest records its hash and crop coordinates.
 The crop layout is specific to the ten-page paper supplied for this study.
 
@@ -66,13 +66,19 @@ On a CPU-only machine, create a virtual environment and install
 .venv/bin/python scripts/run.py export --archive --loss-curves
 ```
 
-The `--archive` flag selects historical inputs. Figures go to `paper_figures/`;
-tables and CSVs go to `paper_tables/`, outside the `published/` directories.
+The `--archive` flag reads historical inputs from `results/archive/`.
+Figures go to `results/generated/figures/`; tables and CSVs go to
+`results/generated/tables/`. These new exports stay local and leave the paper
+assets and archived snapshots intact.
 These commands reproduce historical artifacts, including the old 1B tests and
 unvalidated TAO outputs. They do not regenerate the current study figures.
 The optional loss-curve export uses the corrected template-free 7B reruns.
 To plot or export a new run, set `RESULTS_DIR_1B`, `RESULTS_DIR_7B`, or
 `RESULTS_DIR_8B` to its output directory. Every exporter uses the same mapping.
+
+For the historical depth explorer, run
+`python3 scripts/run.py figures --archive --depth-explorer`.
+Its HTML and intermediate data go to `results/generated/depth_explorer/`.
 
 ## Implementation
 

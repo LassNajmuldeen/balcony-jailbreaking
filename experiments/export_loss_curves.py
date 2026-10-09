@@ -1,4 +1,4 @@
-"""Export mean GCG loss curves to paper_tables/loss_curves/. Uses the template-free 7B
+"""Export mean GCG loss curves to results/generated/tables/loss_curves/. Uses the template-free 7B
 reruns. Requires every model/benchmark/exit to have 50 behaviors and 150 steps."""
 
 import csv
@@ -7,46 +7,46 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTDIR = ROOT / "paper_tables" / "loss_curves"
+OUTDIR = ROOT / "results/generated/tables" / "loss_curves"
 N_STEPS = 150
 N_BEHAVIOURS = 50
 
 # model -> (csv stem, exits shallowest-first, {benchmark: {exit: (dir, file)}})
 MODELS = {
     "1B": {
-        "stem": "LLM-1b",
+        "stem": "llm_1b",
         "exits": ["4", "8", "12", "full"],
         "sources": {
-            "Harmbench": {e: ("results", "phase2_attacks.json") for e in ["4", "8", "12", "full"]},
-            "Advbench":  {e: ("results", "advbench_attacks.json") for e in ["4", "8", "12", "full"]},
+            "Harmbench": {e: ("results/archive/1b", "phase2_attacks.json") for e in ["4", "8", "12", "full"]},
+            "Advbench":  {e: ("results/archive/1b", "advbench_attacks.json") for e in ["4", "8", "12", "full"]},
         },
     },
     "7B": {
-        "stem": "Llama2-7b",
+        "stem": "llama2_7b",
         "exits": ["15", "18", "21", "full"],
         "sources": {
             # the overnight repair wrote one directory per cell; the two full-exit
             # cells predate it and sit at the top level.
             "Harmbench": {
-                "15":   ("results_7b_notemplate/notpl_cell_harmbench_15", "phase2_attacks.json"),
-                "18":   ("results_7b_notemplate/notpl_cell_harmbench_18", "phase2_attacks.json"),
-                "21":   ("results_7b_notemplate/notpl_cell_harmbench_21", "phase2_attacks.json"),
-                "full": ("results_7b_notemplate",                         "phase2_attacks.json"),
+                "15":   ("results/archive/7b_plain/harmbench_exit_15", "phase2_attacks.json"),
+                "18":   ("results/archive/7b_plain/harmbench_exit_18", "phase2_attacks.json"),
+                "21":   ("results/archive/7b_plain/harmbench_exit_21", "phase2_attacks.json"),
+                "full": ("results/archive/7b_plain",                         "phase2_attacks.json"),
             },
             "Advbench": {
-                "15":   ("results_7b_notemplate/notpl_cell_advbench_15", "advbench_attacks.json"),
-                "18":   ("results_7b_notemplate/notpl_cell_advbench_18", "advbench_attacks.json"),
-                "21":   ("results_7b_notemplate/notpl_cell_advbench_21", "advbench_attacks.json"),
-                "full": ("results_7b_notemplate",                        "advbench_attacks.json"),
+                "15":   ("results/archive/7b_plain/advbench_exit_15", "advbench_attacks.json"),
+                "18":   ("results/archive/7b_plain/advbench_exit_18", "advbench_attacks.json"),
+                "21":   ("results/archive/7b_plain/advbench_exit_21", "advbench_attacks.json"),
+                "full": ("results/archive/7b_plain",                        "advbench_attacks.json"),
             },
         },
     },
     "8B": {
-        "stem": "Llama3-8b",
+        "stem": "llama3_8b",
         "exits": ["15", "18", "21", "full"],
         "sources": {
-            "Harmbench": {e: ("results_8b", "phase2_attacks.json") for e in ["15", "18", "21", "full"]},
-            "Advbench":  {e: ("results_8b", "advbench_attacks.json") for e in ["15", "18", "21", "full"]},
+            "Harmbench": {e: ("results/archive/8b", "phase2_attacks.json") for e in ["15", "18", "21", "full"]},
+            "Advbench":  {e: ("results/archive/8b", "advbench_attacks.json") for e in ["15", "18", "21", "full"]},
         },
     },
 }
@@ -115,7 +115,7 @@ def main():
     OUTDIR.mkdir(parents=True, exist_ok=True)
     for name, model in MODELS.items():
         for bench, curves in built[name].items():
-            target = OUTDIR / f"{model['stem']}_{bench}.csv"
+            target = OUTDIR / f"{model['stem']}_{bench.lower()}.csv"
             with open(target, "w", newline="") as f:
                 csv.writer(f, lineterminator="\n").writerows(rows(curves, model["exits"]))
             print(f"{target.name}: {N_STEPS} rows, "

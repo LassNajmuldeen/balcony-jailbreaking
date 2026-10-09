@@ -13,7 +13,7 @@
         660,
         255
       ],
-      "output": "paper_figures/published/loss_vs_asr.png"
+      "output": "results/paper/figures/loss_vs_asr.png"
     },
     {
       "kind": "figure",
@@ -25,7 +25,7 @@
         616,
         273
       ],
-      "output": "paper_figures/published/pipeline.png"
+      "output": "results/paper/figures/pipeline.png"
     },
     {
       "kind": "figure",
@@ -37,7 +37,7 @@
         655,
         304
       ],
-      "output": "paper_figures/published/attack_success.png"
+      "output": "results/paper/figures/attack_success.png"
     },
     {
       "kind": "figure",
@@ -49,7 +49,7 @@
         690,
         460
       ],
-      "output": "paper_figures/published/loss_curves.png"
+      "output": "results/paper/figures/loss_curves.png"
     },
     {
       "kind": "table",
@@ -61,7 +61,7 @@
         665,
         345
       ],
-      "output": "paper_tables/published/model_configuration.png"
+      "output": "results/paper/tables/model_configuration.png"
     },
     {
       "kind": "table",
@@ -73,7 +73,7 @@
         665,
         264
       ],
-      "output": "paper_tables/published/utility_clean.png"
+      "output": "results/paper/tables/utility_clean.png"
     },
     {
       "kind": "table",
@@ -85,7 +85,7 @@
         665,
         287
       ],
-      "output": "paper_tables/published/utility_attacked.png"
+      "output": "results/paper/tables/utility_attacked.png"
     }
   ]
 }

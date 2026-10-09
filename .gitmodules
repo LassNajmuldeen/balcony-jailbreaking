@@ -1,10 +1,10 @@
 [submodule "Balcony-LLaMA"]
-	path = Balcony-LLaMA
+	path = third_party/balcony_llama
 	url = https://github.com/benyaminjami/Balcony-LLaMA.git
 	branch = finetuning
 [submodule "TAO-Attack"]
-	path = TAO-Attack
+	path = third_party/tao_attack
 	url = https://github.com/ZevineXu/TAO-Attack.git
 [submodule "AdversariaLLM"]
-	path = AdversariaLLM
+	path = third_party/adversariallm
 	url = https://github.com/LLM-QC/AdversariaLLM.git

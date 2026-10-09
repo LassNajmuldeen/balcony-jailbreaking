@@ -1,10 +1,10 @@
-"""One tidy CSV holding every number the paper reports, for plotting from LaTeX.
+"""Export archived measurements to one tidy CSV for plotting from LaTeX.
 
-Writes `paper_tables/measurements.csv` in long ("tidy") form: one
+Writes `results/generated/tables/measurements.csv` in long ("tidy") form: one
 measurement per row, so pgfplots / pgfplotstable can filter it with `discard if
 not` and read x/y straight out of two columns. Attack loss and ASR route through
-export_results.collect(), the same path as paper_tables/results_table.* and
-make_paper_assets.py, so no number here can disagree with a figure or a table.
+export_results.collect(), the same path as results/generated/tables/results_table.* and
+make_paper_assets.py. These historical measurements can differ from the paper.
 
 Columns
   model            1b | 7b | 8b
@@ -42,7 +42,7 @@ as a utility_* row for all arms.
 Torch-free and read-only. Safe to run while the GPU is busy.
 
 usage:
-  AdversariaLLM/.venv/bin/python experiments/export_paper_csv.py
+  .venv/bin/python experiments/export_paper_csv.py
 """
 
 import csv
@@ -51,10 +51,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config import PROJECT_ROOT  # noqa: E402
+from config import PROJECT_ROOT, GENERATED_DIR  # noqa: E402
 import export_results as er  # noqa: E402
 
-OUT = PROJECT_ROOT / "paper_tables" / "measurements.csv"
+OUT = GENERATED_DIR / "tables" / "measurements.csv"
 
 MODELS = ["1b", "7b", "8b"]
 LAYERS = {"1b": 16, "7b": 32, "8b": 32}

@@ -1,4 +1,4 @@
-# Experiment dependencies in addition to AdversariaLLM/pyproject.toml.
+# Experiment dependencies in addition to third_party/adversariallm/pyproject.toml.
 lm-eval==0.4.12
 rouge-score==0.1.2
 scikit-learn>=1.5,<2

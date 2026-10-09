@@ -26,6 +26,8 @@ CLAUDE.md
 
 # New runs and scratch work; recorded results remain tracked.
 runs/
+/results/runs/
+/results/generated/
 run_logs*/
 run_state*/
 *.log

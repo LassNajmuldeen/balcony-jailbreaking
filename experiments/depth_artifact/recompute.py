@@ -3,14 +3,15 @@ from itertools import combinations
 import json
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent.parent          # repo root, where results*/ live
+ROOT = Path(__file__).resolve().parents[2]
+HERE = ROOT / "results/generated/depth_explorer"
+HERE.mkdir(parents=True, exist_ok=True)
 def R(p): return str(ROOT / p)
 
 MODELS = {
- "1b": ("results",  ["4","8","12"],   "full", 16),
- "7b": ("results_7b", ["15","18","21"], "full", 32),
- "8b": ("results_8b", ["15","18","21"], "full", 32),
+ "1b": ("results/archive/1b",  ["4","8","12"],   "full", 16),
+ "7b": ("results/archive/7b", ["15","18","21"], "full", 32),
+ "8b": ("results/archive/8b", ["15","18","21"], "full", 32),
 }
 BENCH = {"harmbench": ("harmbench_gcg","baseline_gcg"),
          "advbench":  ("advbench_gcg","gcg_no_balcony_advbench")}

@@ -3,7 +3,7 @@
 # the baseline's suffix tested on every balcony exit.
 #
 # that turns the 4x4 exit matrix into a 5x5 one, with "no_balcony" as the extra
-# row and column. the results get merged into results/phase2_transfer.json, so
+# row and column. the results get merged into results/runs/<model>/phase2_transfer.json, so
 # this requires saved GCG attacks for both the balcony and baseline arms.
 
 import json
@@ -12,7 +12,7 @@ from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
-sys.path.insert(0, str(_REPO / "AdversariaLLM"))
+sys.path.insert(0, str(_REPO / "third_party" / "adversariallm"))
 
 import torch
 

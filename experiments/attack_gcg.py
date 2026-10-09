@@ -10,7 +10,7 @@ from pathlib import Path
 # theres a noqa on basically every import in this block
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
-sys.path.insert(0, str(_REPO / "AdversariaLLM"))
+sys.path.insert(0, str(_REPO / "third_party" / "adversariallm"))
 
 import torch
 
@@ -180,7 +180,7 @@ def transfer_completion(target_system, user_content_with_suffix, exit_layer, mod
 
 def run_transfer_matrix(model, tokenizer, attacks, not_allowed_ids):
     """takes every (source exit, behavior) suffix and evaluates it on every target
-    exit. thats the 4x4 matrix in results/phase2_transfer.json."""
+    exit. thats the 4x4 matrix in results/runs/<model>/phase2_transfer.json."""
     target_system = UndefendedTarget(model=model, tokenizer=tokenizer)
     transfer = {}
     for source_exit in EXITS:

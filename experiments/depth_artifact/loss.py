@@ -1,14 +1,15 @@
 import json
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent.parent          # repo root, where results*/ live
+ROOT = Path(__file__).resolve().parents[2]
+HERE = ROOT / "results/generated/depth_explorer"
+HERE.mkdir(parents=True, exist_ok=True)
 def R(p): return str(ROOT / p)
 FILES={"harmbench":("phase2_attacks.json","no_balcony_attacks.json"),
        "advbench":("advbench_attacks.json","gcg_no_balcony_advbench_attacks.json")}
-MODELS={"1b":("results",["4","8","12","full"],16),
-        "7b":("results_7b",["15","18","21","full"],32),
-        "8b":("results_8b",["15","18","21","full"],32)}
+MODELS={"1b":("results/archive/1b",["4","8","12","full"],16),
+        "7b":("results/archive/7b",["15","18","21","full"],32),
+        "8b":("results/archive/8b",["15","18","21","full"],32)}
 out={}
 for m,(d,exits,layers) in MODELS.items():
     for bench,(bf,basef) in FILES.items():

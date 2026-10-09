@@ -9,26 +9,17 @@ from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
-sys.path.insert(0, str(_REPO / "AdversariaLLM"))
+sys.path.insert(0, str(_REPO / "third_party" / "adversariallm"))
 
 from config import RESULTS_DIR, N_BEHAVIORS, EXITS  # noqa: E402
 
-# which exits each results dir is meant to contain. this is deliberately NOT
-# config.ALL_EXITS: scripts/run.py experiment --stage tao's merge loop only sets RESULTS_DIR, so
-# EXITS falls back to its default ("15 18 21 full" now, "4 8 12 full" before
-# 2026-09-14) and whichever model doesnt match would be called complete the moment
-# four exits existed under the wrong names. keying off
-# the directory instead means the guard is right no matter how this gets invoked.
+# Archive names identify their historical exit sets; new runs use explicit EXITS.
 EXPECTED_EXITS = {
-    "results": ["4", "8", "12", "full"],
-    "results_7b": ["15", "18", "21", "full"],
-    "results_8b": ["15", "18", "21", "full"],
-    # the full budget rerun (scripts/run.py experiment --stage tao, 500 steps / batch 512). deliberately
-    # a seperate dir from results_7b/results_8b: those hold 150 step results and
-    # merging the two would put two attack budgets under one ASR without anything
-    # downstream being able to tell
-    "results_7b_tao500": ["15", "18", "21", "full"],
-    "results_8b_tao500": ["15", "18", "21", "full"],
+    "1b": ["4", "8", "12", "full"],
+    "7b": ["15", "18", "21", "full"],
+    "8b": ["15", "18", "21", "full"],
+    "7b_tao_500": ["15", "18", "21", "full"],
+    "8b_tao_500": ["15", "18", "21", "full"],
 }
 
 

@@ -9,8 +9,11 @@ import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ARCHIVE_DIR = PROJECT_ROOT / "results" / "archive"
+PAPER_DIR = PROJECT_ROOT / "results" / "paper"
+GENERATED_DIR = PROJECT_ROOT / "results" / "generated"
 
-ROOT = str(PROJECT_ROOT / "AdversariaLLM")
+ROOT = str(PROJECT_ROOT / "third_party" / "adversariallm")
 
 DATA_ROOT = os.environ.get("DATA_ROOT") or ROOT
 
@@ -56,7 +59,7 @@ EXITS = _parse_exits(_env_str("EXITS", "15 18 21 full"))
 ALL_EXITS = (["no_balcony"] if BASELINE_MODEL else []) + EXITS
 
 
-_results = Path(_env_str("RESULTS_DIR", "results"))
+_results = Path(_env_str("RESULTS_DIR", "results/runs/manual"))
 RESULTS_DIR = _results if _results.is_absolute() else PROJECT_ROOT / _results
 
 FIG_DIR = RESULTS_DIR / "figures"
@@ -165,7 +168,7 @@ def __getattr__(name):
     if name == "BALCONY_MODEL":
         raise ImportError(
             "BALCONY_MODEL is required. For example:\n"
-            "  BALCONY_MODEL=parsakaveh/Balcony-LLaMA2-7B RESULTS_DIR=results_7b\n"
-            "  BALCONY_MODEL=adpretko/Balcony-Meta-LLaMA3-8B-exit-15-18-21 RESULTS_DIR=results_8b"
+            "  BALCONY_MODEL=parsakaveh/Balcony-LLaMA2-7B RESULTS_DIR=results/runs/7b\n"
+            "  BALCONY_MODEL=adpretko/Balcony-Meta-LLaMA3-8B-exit-15-18-21 RESULTS_DIR=results/runs/8b"
         )
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
