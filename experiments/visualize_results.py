@@ -1,4 +1,4 @@
-# builds all 7 figures for RESULTS.md from the json result files.
+# Builds historical figures from the archived JSON result files.
 # no gpu needed, no model loading, just reads json and makes pngs.
 # safe to rerun whenever, it just overwrites the old figures.
 #

@@ -97,7 +97,7 @@ def plan(args):
         return [("archived-figures", "make_paper_assets.py", [], {})]
     if args.command == "export":
         if not args.archive:
-            raise ValueError("use --archive to inspect historical exports; published results are in RESULTS.md")
+            raise ValueError("use --archive to inspect historical exports; published results are in README.md")
         jobs = [("tables", "export_results.py", [], {}),
                 ("csv", "export_paper_csv.py", [], {})]
         if args.loss_curves:

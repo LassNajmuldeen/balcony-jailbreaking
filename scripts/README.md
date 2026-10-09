@@ -24,6 +24,10 @@ Active models are `7b` and `8b`. Choose `--exits 15 full` for a subset. Budgets 
 and 512 generated tokens. Use `--n-behaviors`, `--num-steps`, and
 `--max-new-tokens` to change them.
 
+Model checkpoints are defined in `experiments/models.py`. Each preset uses its
+matching chat template; `--plain` selects template-free prompts. Keep those
+variants in separate output directories and use matching templates in comparisons.
+
 New runs go to `runs/<model>/`; use a new `--results-dir` for different settings.
 The runner stops on a failed stage and rejects incomplete attack outputs.
 `--resume` skips completed attack stages with matching settings; TAO also saves
@@ -52,6 +56,9 @@ The PDF remains local; the source manifest records its hash and crop coordinates
 The crop layout is specific to the ten-page paper supplied for this study.
 
 To inspect older exports:
+
+On a CPU-only machine, create a virtual environment and install
+`'numpy>=1.26,<2'` and `'matplotlib>=3.10,<4'` first; no models are downloaded.
 
 ```bash
 .venv/bin/python scripts/run.py figures --archive

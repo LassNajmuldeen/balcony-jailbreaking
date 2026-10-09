@@ -289,7 +289,7 @@ def token_gradients_tao(model, input_ids, neg_input_ids, alpha,
         # time the negative prompt was the longer of the two the slice came out
         # empty: "ValueError: Expected input batch_size (0) to match target
         # batch_size (N)". nobody caught it because TAO always crashed earlier, in
-        # the KV cache bug (SETUP.md 9a).
+        # a KV cache bug.
         #
         # the negative manager's target is `target + "\n" + refusal`, so the
         # negative token sequence is a prefix EXTENSION of the positive one. under
@@ -967,9 +967,10 @@ else:
 
 
 def save_checkpoint(all_results):
-    """writes after every behavior, so a crash at hour N doesnt lose the whole run
-    (SETUP.md, this used to save once at the very end). goes to a temp file and
-    then renames, so getting killed mid write cant truncate the real one."""
+    """Save after each behavior, replacing the checkpoint atomically.
+
+    A crash during writing leaves the previous checkpoint intact.
+    """
     tmp = CHECKPOINT_PATH.with_suffix(".json.tmp")
     with open(tmp, "w") as f:
         json.dump(all_results, f, indent=2)
