@@ -9,8 +9,9 @@ development tests; neither contributes results to this study.
 
 ## Results
 
-GCG over 150 steps on 50 behaviors per benchmark. The figures and tables below
-come directly from the paper, which is the source of truth for reported results.
+GCG over 150 steps on 50 behaviors per benchmark, run on a single NVIDIA
+RTX PRO 6000 Blackwell GPU. The figures and tables below come directly from the
+paper, which is the source of truth for reported results.
 
 ![Evaluation pipeline with early exits at layers 15, 18, 21, and full depth.](results/paper/figures/pipeline.png)
 
