@@ -1,30 +1,21 @@
-# ---------------------------------------------------------------------------
-# What this repo tracks: everything needed to rebuild this project on a fresh
-# machine -- the adapter, the experiment scripts, the orchestration drivers in
-# scripts/, the AdversariaLLM patches, the chat templates, SETUP.md, the paper
-# assets and (since 2026-09-13) the raw results.
-#
-# results/ and results_*/ are tracked now, the machine that made them is going
-# away and the paper figures and tables cant be rebuilt without them. its ~48MB
-# of json and png, no single file over 20MB. see the negation rules at the bottom.
-#
-# What it still does not track: run_logs/ (99MB of console output, nothing reads
-# it back), the run-state markers, which only mean anything on the machine that
-# produced them, and local-notes/, which is my own notes and stays off github.
-#
-# The three dependency repos (Balcony-LLaMA, TAO-Attack, AdversariaLLM) are git
-# SUBMODULES pinned by commit -- see .gitmodules. AdversariaLLM needs the two
-# patches in patches/ applied on top of its pinned commit; nothing else does.
-# ---------------------------------------------------------------------------
-
-# ---- python -------------------------------------------------------------
+# Python and local environments
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 .venv/
 *.egg-info/
+.pytest_cache/
+.ruff_cache/
 
-# ---- model weights and other large binaries ------------------------------
+# Credentials and local configuration
+.env
+.env.*
+*.key
+*.pem
+.agents/
+.codex/
+CLAUDE.md
+
+# Model weights
 *.bin
 *.safetensors
 *.pt
@@ -33,54 +24,26 @@ __pycache__/
 *.h5
 *.pkl
 
-# ---- environment and secrets ---------------------------------------------
-.env
-*.key
-*.pem
+# New runs and scratch work; recorded results remain tracked.
+runs/
+run_logs*/
+run_state*/
+*.log
+*.bak
+*.bak-*
+*.attempt[0-9]
+*.tmp
+.edit_backups/
+archive_*/
+local*/
+notes/
+scratch/
+*.tar.gz
 
-# ---- OS and editor junk --------------------------------------------------
+# Editor and operating system files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# ---- run bookkeeping -----------------------------------------------------
-# Per-shard logs and the .done/.failed/.running/.skipped markers used for
-# resume. Machine-local by definition.
-run_logs/
-run_state/
-run_state_*/
-*.log
-*.log.attempt[0-9]
-
-# ---- build artefacts -----------------------------------------------------
-# Rebuild with scripts/make_cluster_bundle.sh.
-tao_cluster_bundle.tar.gz
-
-# ---- my own notes --------------------------------------------------------
-# CLAUDE.md, ideas, handoff notes, the paper pdfs and the mentor csvs. local only,
-# never commit this. was tracked by mistake from 2026-09-10 to 2026-09-14.
-local-notes/
-
-# ---- scratch, backups, superseded archives -------------------------------
-.edit_backups/
-archive_tao_prefix_*/
-*.bak
-*.bak-*
-*.attempt[0-9]
-
-# ---- json ----------------------------------------------------------------
-# Most .json here is run output. The exceptions are source: the adapter's model
-# config, and the four small tables the depth figure is rebuilt from.
-*.json
-!adapter/**/*.json
-!experiments/depth_artifact/*.json
-
-# ---- raw results (tracked on purpose) ------------------------------------
-# per-behaviour attack records, completions, judge scores and the per-arm
-# figures. these come last so they win over *.json and *.bak-* above, the .bak
-# files are the pre-nanfix copies and worth keeping.
-!results/**
-!results_*/**

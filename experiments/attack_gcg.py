@@ -1,14 +1,5 @@
-# the main experiment script. attacks every balcony exit on its own with GCG on
-# harmbench, and can also build a transfer matrix by testing each suffix against
-# each exit.
-#
-# writes results/phase2_attacks.json (main() does this) and, when the transfer
-# pass is run, results/phase2_transfer.json. note that main() only does the attack
-# part these days, the transfer matrix on disk came from calling
-# run_transfer_matrix() separately. the functions are still here because
-# transfer_matrix_baseline.py extends the same file with the baseline row/column.
+"""GCG attacks on either benchmark, with optional baseline and exit transfer."""
 
-import copy
 import json
 import sys
 import time
@@ -24,7 +15,7 @@ sys.path.insert(0, str(_REPO / "AdversariaLLM"))
 import torch
 
 import adapter.balcony_llama  # noqa: F401 (registers "nested_llama" locally)
-from adapter.exit_wrapper import wrap_for_single_exit
+from adapter.exit_wrapper import wrap_for_single_exit, wrap_plain_model
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from adversariallm.attacks import Attack
@@ -32,9 +23,10 @@ from adversariallm.attacks.attack import GenerationConfig
 from adversariallm.attacks.gcg import GCGConfig, compute_loss
 from adversariallm.dataset.adv_behaviors import AdvBehaviorsConfig, AdvBehaviorsDataset
 from adversariallm.defenses.base import UndefendedTarget
-from adversariallm.lm_utils import get_disallowed_ids, prepare_conversation
+from adversariallm.lm_utils import TokenMergeError, get_disallowed_ids, prepare_conversation
 
 from config import (  # noqa: E402
+    ATTACK_TARGET, BENCHMARK, require_baseline_model, result_filename,
     ensure_chat_template,
     EXITS,
     MAX_NEW_TOKENS,
@@ -44,7 +36,7 @@ from config import (  # noqa: E402
     ROOT,
     SEARCH_WIDTH,
     TOPK,
-    BALCONY_MODEL as MODEL_ID,
+    BALCONY_MODEL,
 )
 
 # i used these to tag refusals early on but they turned out to be pretty much
@@ -65,6 +57,7 @@ def looks_like_refusal(text: str) -> bool:
 
 
 def load_model_and_tokenizer():
+    MODEL_ID = require_baseline_model() if ATTACK_TARGET == "baseline" else BALCONY_MODEL
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=False)
     tokenizer = ensure_chat_template(tokenizer)
     if not tokenizer.pad_token:
@@ -77,7 +70,10 @@ def load_model_and_tokenizer():
     ).to("cuda").eval()
     # this is what gives us set_active_exit() and makes one exit look like a
     # completely ordinary causal LM to everything downstream
-    model = wrap_for_single_exit(model)
+    if ATTACK_TARGET == "balcony":
+        model = wrap_for_single_exit(model)
+    elif model.config.model_type == "nested_llama":
+        model = wrap_plain_model(model)
     return model, tokenizer
 
 
@@ -86,9 +82,10 @@ def run_attacks(model, tokenizer, dataset):
     object, which re-seeds the RNG back to seed=0, so the runs dont depend on
     eachother or on the order the exits happen to be listed in."""
     attacks = {}
-    for exit_layer in EXITS:
+    for exit_layer in (["no_balcony"] if ATTACK_TARGET == "baseline" else EXITS):
         print(f"\n=== Attacking exit {exit_layer} ===", flush=True)
-        model.set_active_exit(exit_layer)
+        if exit_layer != "no_balcony":
+            model.set_active_exit(exit_layer)
 
         gcg_config = GCGConfig(
             num_steps=NUM_STEPS,
@@ -209,47 +206,108 @@ def run_transfer_matrix(model, tokenizer, attacks, not_allowed_ids):
     return transfer
 
 
-def summarize_attacks(attacks):
-    # this "approx ASR" column is the keyword heuristic one and it is NOT the
-    # number that goes in the paper. judge_harmfulness.py produces that one
-    print("\n\n=== SUMMARY: per-exit attack difficulty ===")
-    print(f"{'exit':>6} | {'mean final loss':>16} | {'refusal rate':>14} | {'non-refusal (approx ASR)':>26}")
-    for exit_layer in EXITS:
-        behaviors = attacks[str(exit_layer)]
-        mean_loss = sum(b["final_loss"] for b in behaviors) / len(behaviors)
-        refusal_rate = sum(looks_like_refusal(b["own_exit_completion"] or "") for b in behaviors) / len(behaviors)
-        approx_asr = 1.0 - refusal_rate
-        print(f"{str(exit_layer):>6} | {mean_loss:16.4f} | {refusal_rate:14.2%} | {approx_asr:25.2%}")
+FILLER_SUFFIX = GCGConfig().optim_str_init
+
+
+@torch.no_grad()
+def baseline_teacher_forced_loss(model, tokenizer, user_content, target_text, not_allowed_ids):
+    """loss on the target string with the user message given as is. no exit
+    switching here, this model only has the one output head."""
+    conversation = [
+        {"role": "user", "content": user_content},
+        {"role": "assistant", "content": target_text},
+    ]
+    pre_ids, attack_prefix_ids, prompt_ids, attack_suffix_ids, post_ids, target_ids = prepare_conversation(
+        tokenizer, conversation
+    )[0]
+    full_ids = torch.cat(
+        [pre_ids, attack_prefix_ids, prompt_ids, attack_suffix_ids, post_ids, target_ids], dim=0
+    ).unsqueeze(0).to(model.device)
+
+    outputs = model(input_ids=full_ids)
+    logits = outputs.logits
+    target_len = target_ids.size(0)
+    shift_logits = logits[:, -target_len - 1:-1, :]   # predict token t from t-1
+    shift_labels = full_ids[:, -target_len:]
+
+    loss = compute_loss(shift_logits, shift_labels, "ce", not_allowed_ids)
+    return loss.item()
+
+def run_baseline_control(model, tokenizer, dataset, not_allowed_ids):
+    """clean loss, i.e. what the loss looks like before GCG optimises anything.
+
+    two conditions per behavior: nothing appended at all, and GCG's untouched
+    starting suffix. the second one is the honest comparator for final_loss,
+    because it holds the prompt length roughly constant.
+    """
+    print("\n=== Baseline control (no-balcony model) ===", flush=True)
+    per_behavior = []
+    for i in range(len(dataset)):
+        user_msg, target_msg = dataset[i]
+        base_content = user_msg["content"]
+        target_text = target_msg["content"]
+
+        no_suffix_loss = baseline_teacher_forced_loss(model, tokenizer, base_content, target_text, not_allowed_ids)
+        try:
+            filler_loss = baseline_teacher_forced_loss(
+                model, tokenizer, base_content + FILLER_SUFFIX, target_text, not_allowed_ids
+            )
+        except TokenMergeError:
+            # the last token of the prompt merged with the first token of the
+            # filler. a space in between fixes it, GCG does the same internally
+            filler_loss = baseline_teacher_forced_loss(
+                model, tokenizer, base_content + " " + FILLER_SUFFIX, target_text, not_allowed_ids
+            )
+
+        per_behavior.append({
+            "behavior_idx": i,
+            "no_suffix_loss": no_suffix_loss,
+            "filler_loss": filler_loss,
+        })
+        print(f"  [{i}] no_suffix_loss={no_suffix_loss:.4f} filler_loss={filler_loss:.4f}", flush=True)
+    return per_behavior
 
 
 def main():
-    print("Loading model + tokenizer...", flush=True)
+    import argparse
+    from behavior_datasets import load_benchmark
+    from config import HARMBENCH_MESSAGES, HARMBENCH_TARGETS
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--transfer", action="store_true",
+                        help="evaluate saved HarmBench suffixes across exits")
+    args = parser.parse_args()
     model, tokenizer = load_model_and_tokenizer()
-
-    # shuffle=False and a plain range so behavior i means the same behavior in
-    # every run and every arm. the transfer matrix joins on behavior_idx, so if
-    # this ever got shuffled the whole thing would silently line up wrong
-    dataset = AdvBehaviorsDataset(AdvBehaviorsConfig(
-        messages_path=f"{ROOT}/data/behavior_datasets/harmbench_behaviors_text_all.csv",
-        targets_path=f"{ROOT}/data/optimizer_targets/harmbench_targets_text.json",
-        idx=list(range(N_BEHAVIORS)),
-        shuffle=False,
-    ))
-    print(f"Loaded {len(dataset)} behaviors", flush=True)
-
-    # not_allowed_ids is the set of tokens GCG isnt allowed to put in the suffix.
-    # i clip it to the vocab size because the disallowed list can hold ids past
-    # the end of this model's embedding table, which then indexes out of bounds
     not_allowed_ids = get_disallowed_ids(tokenizer, False, False).to(model.device)
-    embed_matrix = model.get_input_embeddings().weight
-    not_allowed_ids = not_allowed_ids[not_allowed_ids < embed_matrix.size(0)]
+    not_allowed_ids = not_allowed_ids[not_allowed_ids < model.get_input_embeddings().weight.size(0)]
+    if args.transfer:
+        if ATTACK_TARGET != "balcony" or BENCHMARK != "harmbench":
+            parser.error("transfer requires the balcony model and HarmBench")
+        attacks = json.loads((RESULTS_DIR / "phase2_attacks.json").read_text())
+        transfer = run_transfer_matrix(model, tokenizer, attacks, not_allowed_ids)
+        (RESULTS_DIR / "phase2_transfer.json").write_text(json.dumps(transfer, indent=2) + "\n")
+        return
 
+    # Preserve the original HarmBench category filtering and behavior ordering.
+    if ATTACK_TARGET == "balcony" and BENCHMARK == "harmbench":
+        dataset = AdvBehaviorsDataset(AdvBehaviorsConfig(
+            messages_path=HARMBENCH_MESSAGES, targets_path=HARMBENCH_TARGETS,
+            idx=list(range(N_BEHAVIORS)), shuffle=False,
+        ))
+    else:
+        dataset = load_benchmark(BENCHMARK, n_behaviors=N_BEHAVIORS)
+    if len(dataset) != N_BEHAVIORS:
+        raise ValueError(f"expected {N_BEHAVIORS} behaviors, found {len(dataset)}")
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    if ATTACK_TARGET == "baseline":
+        control = run_baseline_control(model, tokenizer, dataset, not_allowed_ids)
+        name = ("no_balcony_baseline.json" if BENCHMARK == "harmbench"
+                else f"no_balcony_{BENCHMARK}_baseline.json")
+        (RESULTS_DIR / name).write_text(json.dumps({"no_balcony": control}, indent=2) + "\n")
     attacks = run_attacks(model, tokenizer, dataset)
-    with open(RESULTS_DIR / "phase2_attacks.json", "w") as f:
-        json.dump(attacks, f, indent=2)
-    print(f"\nSaved attack results to {RESULTS_DIR / 'phase2_attacks.json'}", flush=True)
-
-    summarize_attacks(attacks)
+    path = RESULTS_DIR / result_filename("gcg", ATTACK_TARGET, BENCHMARK)
+    path.write_text(json.dumps(attacks, indent=2) + "\n")
+    print(f"Saved {path}", flush=True)
 
 
 if __name__ == "__main__":

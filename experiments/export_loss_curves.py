@@ -1,29 +1,5 @@
-"""Write one loss-curve CSV per model per benchmark into `local-notes/csv/`.
-
-Six files, `<model>_<Benchmark>.csv`. Each holds one two-column `iteration,loss`
-block per exit, laid out side by side with a blank spacer column between blocks:
-
-    exit_4 iteration,exit_4 loss,,exit_8 iteration,exit_8 loss,,...
-
-Exits run shallowest first with the full exit last -- the full exit is the
-comparator the study uses as its baseline, since running all layers is the
-un-exited model. 150 rows per file, one per attack step.
-
-Each loss is the mean `loss_curve` over the 50 behaviours at that step.
-
-The 7B reads from `results_7b_notemplate/`, the corrected template-free run. The
-contaminated `results_7b/` is never touched -- see RESULTS.md section 2.1 and
-the chat-template bug, see `local-notes/CLAUDE.md`.
-
-Refuses to write anything unless all six benchmark-model pairs are complete: every
-exit present, 50 behaviours each, all curves the full 150 steps.
-
-Torch-free and read-only apart from the six output files. Safe to run while the GPU
-is busy.
-
-usage:
-  AdversariaLLM/.venv/bin/python experiments/export_loss_curves.py
-"""
+"""Export mean GCG loss curves to paper_tables/loss_curves/. Uses the template-free 7B
+reruns. Requires every model/benchmark/exit to have 50 behaviors and 150 steps."""
 
 import csv
 import json
@@ -31,7 +7,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTDIR = ROOT / "local-notes" / "csv"
+OUTDIR = ROOT / "paper_tables" / "loss_curves"
 N_STEPS = 150
 N_BEHAVIOURS = 50
 
@@ -136,11 +112,12 @@ def main():
 
     built = {name: build(model) for name, model in MODELS.items()}
 
+    OUTDIR.mkdir(parents=True, exist_ok=True)
     for name, model in MODELS.items():
         for bench, curves in built[name].items():
             target = OUTDIR / f"{model['stem']}_{bench}.csv"
             with open(target, "w", newline="") as f:
-                csv.writer(f).writerows(rows(curves, model["exits"]))
+                csv.writer(f, lineterminator="\n").writerows(rows(curves, model["exits"]))
             print(f"{target.name}: {N_STEPS} rows, "
                   f"{len(model['exits'])} exit blocks, "
                   f"{N_BEHAVIOURS} behaviours each")

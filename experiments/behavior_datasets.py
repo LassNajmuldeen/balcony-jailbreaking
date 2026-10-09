@@ -1,11 +1,5 @@
-# benchmark loading, shared between the attack scripts.
-#
-# harmbench and advbench ship different columns overall, but both csvs carry
-# Behavior / BehaviorID / ContextString and both target files are a flat
-# {BehaviorID: target_string} mapping, so one loader covers the two of them. this
-# is the same loader attack_gcg_advbench.py already had inline, just lifted out
-# here so the baseline and TAO scripts can run on either benchmark instead of
-# being hardwired to harmbench.
+"""Load HarmBench or AdvBench conversations in stable CSV order. Rows without optimizer
+targets are excluded before truncation."""
 
 import pandas as pd
 

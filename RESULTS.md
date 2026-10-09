@@ -1,67 +1,30 @@
-# Results: Adversarial Robustness Across Balcony Exits
-# 1. Balcony-LLM-1B
-## 1.1 Attacks, GCG
-| Exit | HarmBench ASR% | HarmBench loss | AdvBench ASR% | AdvBench loss |
-|---|---|---|---|---|
-| Exit 4 | 6.0 | 0.691 | 14.0 | 0.487 |
-| Exit 8 | 10.0 | 0.562 | 12.0 | 0.440 |
-| Exit 12 | 58.0 | 0.376 | 56.0 | 0.315 |
-| Full (16) | 48.0 | 0.253 | 64.0 | 0.257 |
-## 1.2 Utility, clean
-| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
-|---|---|---|---|---|---|---|
-| Exit 4 | 0.3327 | 0.2372 | 0.4537 | 0.5201 | 0.6409 | 0.2446 |
-| Exit 8 | 0.4167 | 0.2807 | 0.5265 | 0.5233 | 0.6904 | 0.2515 |
-| Exit 12 | 0.5463 | 0.3362 | 0.6149 | 0.5683 | 0.7225 | 0.2492 |
-| Full (16) | 0.6120 | 0.3874 | 0.6902 | 0.5919 | 0.7470 | 0.2555 |
-## 1.3 Utility, with GCG suffix attached
-| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
-|---|---|---|---|---|---|---|
-| Exit 4 | 0.3292 | 0.2526 | 0.4074 | 0.5083 | 0.6153 | 0.2539 |
-| Exit 8 | 0.4086 | 0.2722 | 0.5181 | 0.5193 | 0.6610 | 0.2517 |
-| Exit 12 | 0.5417 | 0.3362 | 0.5854 | 0.5422 | 0.7029 | 0.2526 |
-| Full (16) | 0.6049 | 0.3882 | 0.6936 | 0.5517 | 0.7367 | 0.2580 |
-# 2. Balcony-LLaMA2-7B
-## 2.1 Attacks, GCG
-| Exit | HarmBench ASR% | HarmBench loss | AdvBench ASR% | AdvBench loss |
-|---|---|---|---|---|
-| Exit 15 | 36.0 | 0.479 | 46.0 | 0.445 |
-| Exit 18 | 40.0 | 0.455 | 54.0 | 0.490 |
-| Exit 21 | 40.0 | 0.420 | 48.0 | 0.426 |
-| Full (32) | 44.0 | 0.389 | 42.0 | 0.424 |
-## 2.2 Utility, clean
-| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
-|---|---|---|---|---|---|---|
-| Exit 15 | 0.6303 | 0.3473 | 0.6174 | 0.6361 | 0.7421 | 0.3693 |
-| Exit 18 | 0.6843 | 0.3882 | 0.6616 | 0.6504 | 0.7601 | 0.3947 |
-| Exit 21 | 0.7153 | 0.4138 | 0.6827 | 0.6701 | 0.7661 | 0.3999 |
-| Full (32) | 0.7603 | 0.4514 | 0.7395 | 0.6906 | 0.7867 | 0.4093 |
-## 2.3 Utility, with GCG suffix attached
-| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
-|---|---|---|---|---|---|---|
-| Exit 15 | 0.6123 | 0.3242 | 0.4819 | 0.6322 | 0.7176 | 0.3303 |
-| Exit 18 | 0.6572 | 0.3422 | 0.4848 | 0.6527 | 0.7263 | 0.3264 |
-| Exit 21 | 0.6848 | 0.3712 | 0.4891 | 0.6535 | 0.7405 | 0.3354 |
-| Full (32) | 0.7399 | 0.4070 | 0.5724 | 0.6961 | 0.7731 | 0.3842 |
-# 3. Balcony-LLaMA3-8B
-## 3.1 Attacks, GCG
-| Exit | HarmBench ASR% | HarmBench loss | AdvBench ASR% | AdvBench loss |
-|---|---|---|---|---|
-| Exit 15 | 0.0 | 1.904 | 4.0 | 1.530 |
-| Exit 18 | 4.0 | 1.203 | 2.0 | 1.021 |
-| Exit 21 | 10.0 | 1.057 | 8.0 | 0.906 |
-| Full (32) | 24.0 | 0.501 | 26.0 | 0.521 |
-## 3.2 Utility, clean
-| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
-|---|---|---|---|---|---|---|
-| Exit 15 | 0.5189 | 0.3345 | 0.4760 | 0.6582 | 0.6344 | 0.3096 |
-| Exit 18 | 0.5810 | 0.3857 | 0.5732 | 0.6835 | 0.6692 | 0.6137 |
-| Exit 21 | 0.6348 | 0.4292 | 0.6111 | 0.6969 | 0.6953 | 0.6258 |
-| Full (32) | 0.7918 | 0.5401 | 0.7774 | 0.7340 | 0.8063 | 0.6211 |
-## 3.3 Utility, with GCG suffix attached
-| Exit | HellaSwag | ARC-C | ARC-E | WinoGrande | PIQA | MMLU |
-|---|---|---|---|---|---|---|
-| Exit 15 | 0.5149 | 0.3225 | 0.4853 | 0.6440 | 0.6382 | 0.3059 |
-| Exit 18 | 0.5852 | 0.3609 | 0.5598 | 0.6669 | 0.6681 | 0.5891 |
-| Exit 21 | 0.6295 | 0.4010 | 0.6170 | 0.7135 | 0.7084 | 0.5978 |
-| Full (32) | 0.7846 | 0.5154 | 0.7841 | 0.7293 | 0.7992 | 0.6055 |
+# Results
+
+The tables and figures summarize the recorded outputs. Attack success rate (ASR)
+is the percentage of completions with a HarmBench judge score above 0.5.
+Lower attack success at a shallow exit should be read alongside its task performance.
+
+## GCG attack success
+
+| Model | Exits, shallow to full | HarmBench ASR (%) | AdvBench ASR (%) |
+| --- | --- | --- | --- |
+| Balcony 1B | 4, 8, 12, full | 26, 18, 72, 58 | 26, 32, 62, 68 |
+| LLaMA 2 7B | 15, 18, 21, full | 24, 28, 26, 38 | 30, 36, 34, 34 |
+| LLaMA 3 8B | 15, 18, 21, full | 4, 12, 12, 28 | 2, 0, 12, 28 |
+
+Loss, TAO results, and separate baseline arms are in the
+[full table](paper_tables/results_table.md). Figures are in the [README](README.md#figures).
+
+## Data notes
+
+- `results/`, `results_7b/`, and `results_8b/` are the sources for the figures above.
+- `results_7b_notemplate/` contains the separate, corrected template-free GCG reruns, split by exit.
+- `*_512.json` contains regenerated completions. Keep these separate from the original completions and their judge scores.
+- `results_*_tao500/` contains partial TAO shards with a different attack budget. These are not complete benchmark runs.
+- Archived judge files do not consistently record classifier and generation settings. Avoid mixing score variants.
+
+TAO reports a two-stage objective, which can be negative. Its final loss is not
+directly comparable with GCG cross-entropy.
+
+Rebuild the tables with `.venv/bin/python scripts/run.py export`.
+Rebuild the figures with `.venv/bin/python scripts/run.py figures`.

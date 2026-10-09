@@ -1,6 +1,6 @@
 """One tidy CSV holding every number the paper reports, for plotting from LaTeX.
 
-Writes `local-notes/adversarial_balcony_export.csv` in long ("tidy") form: one
+Writes `paper_tables/measurements.csv` in long ("tidy") form: one
 measurement per row, so pgfplots / pgfplotstable can filter it with `discard if
 not` and read x/y straight out of two columns. Attack loss and ASR route through
 export_results.collect(), the same path as paper_tables/results_table.* and
@@ -47,7 +47,6 @@ usage:
 
 import csv
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -55,19 +54,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config import PROJECT_ROOT  # noqa: E402
 import export_results as er  # noqa: E402
 
-OUT = PROJECT_ROOT / "local-notes" / "adversarial_balcony_export.csv"
+OUT = PROJECT_ROOT / "paper_tables" / "measurements.csv"
 
 MODELS = ["1b", "7b", "8b"]
 LAYERS = {"1b": 16, "7b": 32, "8b": 32}
-# results dirs, overridable per model so a rerun in a different dir can be
-# exported without editing this file. RESULTS_DIR_7B=results_7b_tao500 etc.
-# without this the 500 step TAO rerun would export the OLD 150 step numbers and
-# say nothing about it
-RESULTS_DIR = {
-    "1b": os.environ.get("RESULTS_DIR_1B") or "results",
-    "7b": os.environ.get("RESULTS_DIR_7B") or "results_7b",
-    "8b": os.environ.get("RESULTS_DIR_8B") or "results_8b",
-}
+RESULTS_DIR = {name: spec["dir"] for name, spec in er.MODELS.items()}
 EXIT_ORDER = {"1b": ["4", "8", "12", "full", "no_balcony"],
               "7b": ["15", "18", "21", "full", "no_balcony"],
               "8b": ["15", "18", "21", "full", "no_balcony"]}
@@ -237,7 +228,7 @@ def main():
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(sink.rows[0]))
+        w = csv.DictWriter(f, fieldnames=list(sink.rows[0]), lineterminator="\n")
         w.writeheader()
         w.writerows(sink.rows)
 

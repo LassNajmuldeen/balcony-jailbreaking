@@ -12,11 +12,15 @@ Model & Attack & Benchmark & Arm & Exit & Rel.\ depth & Mean loss & ASR (\%) \\
 1B & GCG & advbench & balcony & \textsc{full} & 1.0 & 0.2568 & 68.0 \\
 1B & GCG & harmbench & baseline & \textsc{baseline} & 1.0 & 0.2589 & 62.0 \\
 1B & GCG & advbench & baseline & \textsc{baseline} & 1.0 & 0.2609 & 74.0 \\
-1B & TAO & harmbench & balcony & 12 & 0.75 & -1.4327 & -- \\
-1B & TAO & harmbench & balcony & 4 & 0.25 & -1.5004 & -- \\
-1B & TAO & harmbench & balcony & 8 & 0.5 & -2.1055 & -- \\
-1B & TAO & harmbench & balcony & \textsc{full} & 1.0 & -1.0052 & -- \\
-1B & TAO & harmbench & baseline & \textsc{baseline} & 1.0 & -1.0052 & -- \\
+1B & TAO & harmbench & balcony & 12 & 0.75 & -1.4327 & 16.0 \\
+1B & TAO & harmbench & balcony & 4 & 0.25 & -1.5004 & 8.0 \\
+1B & TAO & harmbench & balcony & 8 & 0.5 & -2.1055 & 4.0 \\
+1B & TAO & harmbench & balcony & \textsc{full} & 1.0 & -1.0052 & 28.0 \\
+1B & TAO & advbench & balcony & 12 & 0.75 & -1.6622 & 24.0 \\
+1B & TAO & advbench & balcony & 4 & 0.25 & -1.5071 & 10.0 \\
+1B & TAO & advbench & balcony & 8 & 0.5 & -1.8999 & 8.0 \\
+1B & TAO & advbench & balcony & \textsc{full} & 1.0 & -1.1052 & 42.0 \\
+1B & TAO & harmbench & baseline & \textsc{baseline} & 1.0 & -1.0052 & 28.0 \\
 7B & GCG & harmbench & balcony & 15 & 0.469 & 0.6048 & 24.0 \\
 7B & GCG & harmbench & balcony & 18 & 0.562 & 0.5428 & 28.0 \\
 7B & GCG & harmbench & balcony & 21 & 0.656 & 0.5167 & 26.0 \\
@@ -27,6 +31,14 @@ Model & Attack & Benchmark & Arm & Exit & Rel.\ depth & Mean loss & ASR (\%) \\
 7B & GCG & advbench & balcony & \textsc{full} & 1.0 & 0.4909 & 34.0 \\
 7B & GCG & harmbench & baseline & \textsc{baseline} & 1.0 & 0.4518 & 32.0 \\
 7B & GCG & advbench & baseline & \textsc{baseline} & 1.0 & 0.6005 & 22.0 \\
+7B & TAO & harmbench & balcony & 15 & 0.469 & -1.0119 & 14.0 \\
+7B & TAO & harmbench & balcony & 18 & 0.562 & -0.3790 & 24.0 \\
+7B & TAO & harmbench & balcony & 21 & 0.656 & -0.2878 & 20.0 \\
+7B & TAO & harmbench & balcony & \textsc{full} & 1.0 & -0.0900 & 28.0 \\
+7B & TAO & advbench & balcony & 15 & 0.469 & -0.6995 & 8.0 \\
+7B & TAO & advbench & balcony & 18 & 0.562 & -0.1136 & 10.0 \\
+7B & TAO & advbench & balcony & 21 & 0.656 & -0.0838 & 10.0 \\
+7B & TAO & advbench & balcony & \textsc{full} & 1.0 & -0.0288 & 24.0 \\
 8B & GCG & harmbench & balcony & 15 & 0.469 & 1.9038 & 4.0 \\
 8B & GCG & harmbench & balcony & 18 & 0.562 & 1.2029 & 12.0 \\
 8B & GCG & harmbench & balcony & 21 & 0.656 & 1.0566 & 12.0 \\
@@ -37,6 +49,14 @@ Model & Attack & Benchmark & Arm & Exit & Rel.\ depth & Mean loss & ASR (\%) \\
 8B & GCG & advbench & balcony & \textsc{full} & 1.0 & 0.5210 & 28.0 \\
 8B & GCG & harmbench & baseline & \textsc{baseline} & 1.0 & 0.5072 & 28.0 \\
 8B & GCG & advbench & baseline & \textsc{baseline} & 1.0 & 0.5223 & 28.0 \\
-8B & TAO & harmbench & baseline & \textsc{baseline} & 1.0 & -0.4398 & -- \\
+8B & TAO & harmbench & balcony & 15 & 0.469 & 0.9515 & 4.0 \\
+8B & TAO & harmbench & balcony & 18 & 0.562 & 0.1393 & 4.0 \\
+8B & TAO & harmbench & balcony & 21 & 0.656 & 0.0721 & 8.0 \\
+8B & TAO & harmbench & balcony & \textsc{full} & 1.0 & -0.4259 & 34.0 \\
+8B & TAO & advbench & balcony & 15 & 0.469 & 0.6403 & 6.0 \\
+8B & TAO & advbench & balcony & 18 & 0.562 & 0.0997 & 6.0 \\
+8B & TAO & advbench & balcony & 21 & 0.656 & -0.1527 & 14.0 \\
+8B & TAO & advbench & balcony & \textsc{full} & 1.0 & -0.2168 & 20.0 \\
+8B & TAO & harmbench & baseline & \textsc{baseline} & 1.0 & -0.4398 & 30.0 \\
 \bottomrule
 \end{tabular}

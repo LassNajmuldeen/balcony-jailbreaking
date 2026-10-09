@@ -1,27 +1,7 @@
-"""folds the per exit TAO shard checkpoints back into the canonical *_attacks.json.
+"""Merge TAO behavior checkpoints into canonical attack files. Publishes only complete exit
+sets with valid behavior indices and successful results. Existing records are retained;
+writes are atomic."""
 
-the parallel runner splits one (model, benchmark, arm) TAO stage into one process
-per exit, and each of them writes RESULTS_DIR/tao_shards/<base>.<shard>.json.
-nothing downstream knows shards exist: judge_harmfulness.py and export_results.py
-both glob "*attacks*.json" straight in RESULTS_DIR. this script merges the shards
-into that one file, keyed by exit exactly the way an unsharded run would have
-written it.
-
-its idempotent and safe to re-run mid flight. it only ever adds behaviors, and a
-shard thats still being written just contributes whatever it has so far.
-
-A GROUP ONLY GETS PUBLISHED ONCE IT IS COMPLETE. publishing is the whole risk
-here: the canonical name is what the judge and the exports glob, so an incomplete
-merge does not look incomplete downstream, it looks like a finished stage with a
-smaller ASR denominator. on 2026-08-09 the 7B had only exit 21 plus a 31/50 exit
-15 and would have been published as a whole 7B TAO harmbench stage. so a group
-missing an exit, or holding fewer than N_BEHAVIORS behaviors on any exit, gets
-skipped with a reason and the canonical file is left alone. MERGE_FORCE=1
-overrides that, for when you deliberately want to look at a partial run.
-
-  RESULTS_DIR=results_7b ./AdversariaLLM/.venv/bin/python experiments/merge_tao_shards.py
-  RESULTS_DIR=results_7b MERGE_FORCE=1 ... # publish anyway (rarely what you want)
-"""
 import json
 import os
 import sys
@@ -31,10 +11,10 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
 sys.path.insert(0, str(_REPO / "AdversariaLLM"))
 
-from config import RESULTS_DIR, N_BEHAVIORS  # noqa: E402
+from config import RESULTS_DIR, N_BEHAVIORS, EXITS  # noqa: E402
 
 # which exits each results dir is meant to contain. this is deliberately NOT
-# config.ALL_EXITS: run_tao_parallel.sh's merge loop only sets RESULTS_DIR, so
+# config.ALL_EXITS: scripts/run.py experiment --stage tao's merge loop only sets RESULTS_DIR, so
 # EXITS falls back to its default ("15 18 21 full" now, "4 8 12 full" before
 # 2026-09-14) and whichever model doesnt match would be called complete the moment
 # four exits existed under the wrong names. keying off
@@ -43,7 +23,7 @@ EXPECTED_EXITS = {
     "results": ["4", "8", "12", "full"],
     "results_7b": ["15", "18", "21", "full"],
     "results_8b": ["15", "18", "21", "full"],
-    # the full budget rerun (run_tao_full.sh, 500 steps / batch 512). deliberately
+    # the full budget rerun (scripts/run.py experiment --stage tao, 500 steps / batch 512). deliberately
     # a seperate dir from results_7b/results_8b: those hold 150 step results and
     # merging the two would put two attack budgets under one ASR without anything
     # downstream being able to tell
@@ -57,9 +37,7 @@ def expected_keys(base, results_dir):
     # the baseline arm is a single un-exited run, so it only ever has one key
     if "no_balcony" in base:
         return ["no_balcony"]
-    exits = EXPECTED_EXITS.get(results_dir.name)
-    if exits is None:
-        return None      # unknown layout, we cant judge completeness at all
+    exits = EXPECTED_EXITS.get(results_dir.name, list(map(str, EXITS)))
     return list(exits)
 
 
@@ -77,9 +55,12 @@ def completeness_problems(base, merged, results_dir, n_behaviors):
             continue
         # counted as a SET of behavior_idx, because two shards overlapping would
         # otherwise inflate the count and look complete when its not
-        n_unique = len({b["behavior_idx"] for b in merged[exit_key]})
-        if n_unique < n_behaviors:
+        indices = {b["behavior_idx"] for b in merged[exit_key]}
+        n_unique = len(indices)
+        if indices != set(range(n_behaviors)):
             problems.append(f"exit {exit_key} has {n_unique}/{n_behaviors}")
+        if any(b.get("error") or b.get("final_loss") is None for b in merged[exit_key]):
+            problems.append(f"exit {exit_key} contains failed behaviors")
     # an exit we never asked for usually means the wrong EXITS were set for the
     # run, so treat it as a problem too rather than merging it in silently
     for exit_key in merged:

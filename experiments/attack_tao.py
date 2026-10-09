@@ -498,7 +498,7 @@ def _slice_loss(logits, ids, target_slice, n_target_toks=0):
 # carry a ContextString paragraph, and a chunk of those is much wider: the shard
 # that died was asking for a single 2.08 GiB allocation. halving the chunk halves
 # that. costs very little because the per step cost is dominated by the fixed
-# backward, not by the candidate sweep (see the cost model in run_tao_full.sh).
+# backward, not by the candidate sweep (see the cost model in scripts/run.py experiment --stage tao).
 FORWARD_CHUNK = int(os.environ.get("TAO_FORWARD_CHUNK") or 32)
 
 
@@ -968,7 +968,7 @@ else:
 
 def save_checkpoint(all_results):
     """writes after every behavior, so a crash at hour N doesnt lose the whole run
-    (SETUP.md 9c, this used to save once at the very end). goes to a temp file and
+    (SETUP.md, this used to save once at the very end). goes to a temp file and
     then renames, so getting killed mid write cant truncate the real one."""
     tmp = CHECKPOINT_PATH.with_suffix(".json.tmp")
     with open(tmp, "w") as f:
@@ -983,11 +983,8 @@ def load_checkpoint():
     try:
         with open(CHECKPOINT_PATH) as f:
             data = json.load(f)
-    except json.JSONDecodeError:
-        # starting fresh beats crashing on resume, the old file gets overwritten
-        # by the first save anyway
-        print(f"WARNING: {CHECKPOINT_PATH} is unreadable, starting fresh", flush=True)
-        return {}
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Unreadable checkpoint: {CHECKPOINT_PATH}; use a new results directory") from exc
     done = sum(len(v) for v in data.values())
     print(f"Resuming from {CHECKPOINT_PATH}: {done} behaviors already complete", flush=True)
     return data
@@ -1017,6 +1014,8 @@ def main():
     for exit_layer in attacked_exits():
         print(f"\n=== TAO attack on exit {exit_layer} ===", flush=True)
         per_behavior = all_results.setdefault(str(exit_layer), [])
+        # Retry failed behaviors, retaining each successful result exactly once.
+        per_behavior[:] = [r for r in per_behavior if not r.get("error") and r.get("final_loss") is not None]
         already_done = {r["behavior_idx"] for r in per_behavior}
         for i in range(BEHAVIOR_START, len(dataset)):
             if i in already_done:
@@ -1080,8 +1079,9 @@ def main():
             per_behavior.append(result)
             save_checkpoint(all_results)
 
+            loss_text = "failed" if result["final_loss"] is None else f"{result['final_loss']:.4f}"
             print(
-                f"  [{i}] final_loss={result['final_loss']:.4f} "
+                f"  [{i}] final_loss={loss_text} "
                 f"stage={result['final_stage']} elapsed={elapsed:.1f}s",
                 flush=True,
             )

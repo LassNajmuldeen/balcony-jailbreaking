@@ -4,7 +4,7 @@
 #
 # that turns the 4x4 exit matrix into a 5x5 one, with "no_balcony" as the extra
 # row and column. the results get merged into results/phase2_transfer.json, so
-# this has to run AFTER attack_gcg_harmbench.py and attack_gcg_baseline.py.
+# this requires saved GCG attacks for both the balcony and baseline arms.
 
 import json
 import sys
@@ -103,7 +103,8 @@ def main():
     baseline_model = AutoModelForCausalLM.from_pretrained(
         BASELINE_ID, trust_remote_code=False, dtype=torch.bfloat16,
     ).to("cuda").eval()
-    baseline_model = wrap_plain_model(baseline_model)
+    if baseline_model.config.model_type == "nested_llama":
+        baseline_model = wrap_plain_model(baseline_model)
 
     baseline_not_allowed_ids = get_disallowed_ids(tokenizer, False, False).to(baseline_model.device)
     baseline_embed_matrix = baseline_model.get_input_embeddings().weight

@@ -1,46 +1,55 @@
-# scripts/
+# Commands
 
-Orchestration drivers. **Not tracked by git** (`.gitignore`: `scripts/`) — they
-are machine- and run-specific, and several are one-off scheduling interventions
-rather than program code.
+Two entry points: `setup.sh` installs the environment; `run.py` runs experiments
+and analysis. Commands resolve paths from the repository, so they also work when
+called from another directory.
 
-Each script resolves the repo root by following its own symlink and going up one
-level, so it works whether you call it as `./scripts/x.sh` or through a root shim:
+## Experiments
 
 ```bash
-REPO="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+.venv/bin/python scripts/run.py experiment --model 7b
+.venv/bin/python scripts/run.py experiment --model 8b --stage tao --benchmarks advbench
+.venv/bin/python scripts/run.py experiment --model 7b --stage gcg --plain --results-dir runs/7b-plain
 ```
 
-## Pipeline drivers
-
-| script | what it does |
+| Stage | Work |
 | --- | --- |
-| `run_all.sh` | full attack/eval pipeline for **one** model size (SETUP.md §8.3). Failure-fatal, with an output completeness check. |
-| `run_matrix.sh` | multi-model driver over the 1B/7B/8B matrix (SETUP.md §8). |
-| `run_tao_parallel.sh` | the TAO worker pool — GPU admission gate, per-shard resume, `--status`/`--dry-run`/`--failed`/`TAO_ONLY=`. |
-| `make_figures.sh` | regenerates the figures from the result JSONs. |
+| `all` | Clean loss → GCG and TAO on both benchmarks → judge → clean and attacked utility |
+| `gcg`, `tao` | Attack the selected exits and benchmarks |
+| `control`, `judge` | Measure unattacked loss, or score saved completions |
+| `utility`, `utility-attacked` | Evaluate ordinary tasks, clean or with an attack suffix |
+| `regenerate`, `merge`, `transfer`, `verify-weights` | Replay completions, combine TAO shards, test cross-exit transfer, or compare checkpoint weights |
 
-## Diagnostics
+Choose `--exits 15 full` for a subset. Budgets default to 50 behaviors, 150 steps,
+and 512 generated tokens. Use `--n-behaviors`, `--num-steps`, and
+`--max-new-tokens` to change them.
 
-| script | what it does |
-| --- | --- |
-| `monitor_gpu.sh` | samples GPU memory into `run_logs/gpu_mem.tsv`, resolving each resident process to the shard it is running. Written after the overcommit OOMs, which were only diagnosable from whichever process happened to lose the race. |
+New runs go to `runs/<model>/`; use a new `--results-dir` for different settings.
+The runner stops on a failed stage and rejects incomplete attack outputs.
+`--resume` skips completed attack stages with matching settings; TAO also saves
+progress after each behavior. `--dry-run` prints commands without loading models.
 
-## Spent one-offs — kept for provenance, not for reuse
+For a separate baseline, pass `--target baseline --baseline-model <checkpoint>`.
+Its default output directory is `runs/<model>-baseline/`.
+Baseline verification also requires `--baseline-model`.
 
-These record *how* specific numbers were produced. Their headers explain why each
-was needed. None of them should be run again as-is.
+## Figures and exports
 
-| script | why it existed |
-| --- | --- |
-| `run_tao_relaunch.sh` | drives shards → merge → judge → utility after the 3-worker pool OOMed. Exists as a separate script only because bash reads a running script incrementally, so the live runner could not be edited. Spent once the current run drains. |
-| `run_utility_then_tao.sh` | re-prioritised a live queue so the per-exit utility evals ran before TAO's ~9 days. The queue it reorders no longer exists. |
-| `run_1b_advbench_baseline.sh` | filled the one GCG cell `run_matrix.sh` never covered (its priority loop was `for m in 7b 8b`). Already run — see `run_state/1b_gcg_advbench_baseline.done`. |
+```bash
+.venv/bin/python scripts/run.py figures
+.venv/bin/python scripts/run.py export
+.venv/bin/python scripts/run.py export --loss-curves
+```
 
-## Temporary root shims
+Figures go to `paper_figures/`; tables and CSVs go to `paper_tables/`.
+These commands read the archived data, including its original prompt variants.
+The optional loss-curve export uses the corrected template-free 7B reruns.
+To plot or export a new run, set `RESULTS_DIR_1B`, `RESULTS_DIR_7B`, or
+`RESULTS_DIR_8B` to its output directory. Every exporter uses the same mapping.
 
-`/run_tao_parallel.sh` and `/run_tao_relaunch.sh` are symlinks into this folder.
-The in-flight `run_tao_relaunch.sh` (started before the move) calls
-`./run_tao_parallel.sh` by relative path from the repo root at five sites, and it
-still has merge → judge → utility ahead of it. **Delete both symlinks once the run
-finishes** — nothing else depends on them.
+## Implementation
+
+`experiments/config.py` holds shared settings and output names.
+`attack_gcg.py` handles both benchmarks and the optional baseline; `attack_tao.py`
+implements TAO with behavior checkpoints. Evaluation and plotting remain in
+separate modules so their dependencies and numerical methods stay easy to inspect.

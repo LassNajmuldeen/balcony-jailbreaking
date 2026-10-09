@@ -1,17 +1,5 @@
-# runs the lm-evaluation-harness benchmarks on each balcony exit and on the
-# no-balcony baseline, to measure how useful each exit still is on normal tasks.
-# this is the other half of the story: "shallow exits resist the attack, ok, but
-# are they still worth anything?"
-#
-# the attacked version of this lives in eval_capabilities_under_attack.py, and it
-# uses the file we write here as its clean comparator, so run this one first.
-#
-# needs: pip install lm-eval
-#
-# usage:
-#   python experiments/eval_capabilities.py                     # all benchmarks
-#   python experiments/eval_capabilities.py --tasks hellaswag   # just one
-#   python experiments/eval_capabilities.py --exits 4 full      # just two exits
+"""Evaluate ordinary language tasks at each exit with lm-eval. Writes utility_eval.json,
+the clean comparator for attacked utility."""
 
 import argparse
 import json

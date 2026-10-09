@@ -1,29 +1,5 @@
-# the same utility benchmarks as eval_capabilities.py, but WITH an adversarial
-# suffix stuck on the front of every input. it answers: does the attack suffix
-# also wreck normal task performance, or does it only buy a jailbreak?
-#
-# for each exit we take the suffix that reached the lowest attack loss, i.e. the
-# most effective attack we found, and prepend it to every benchmark prompt. so
-# this is a worst case measurement, not an average one.
-#
-# --attack picks whose suffixes get used. the clean comparator is utility_eval.json
-# either way, so a gcg run and a tao run share one baseline.
-#
-#   gcg   writes utility_eval_attacked.json      (the original behaviour)
-#   tao   writes utility_eval_attacked_tao.json
-#
-# CAVEAT on --attack tao: suffixes are ranked by final_loss, and TAO's final_loss
-# is target_loss - alpha*neg_loss, which is NOT a target loss. it goes negative,
-# and the most negative value can mean "diverged hardest from the refusal" rather
-# than "matched the target best". so the TAO suffix we pick is the one TAO itself
-# thought was best, the same suffix that produced own_exit_completion, and it is
-# NOT necessarily the strongest jailbreak. dont put a TAO utility delta next to a
-# GCG one as if the two suffixes were chosen by the same criterion.
-#
-# usage:
-#   python experiments/eval_capabilities_under_attack.py
-#   python experiments/eval_capabilities_under_attack.py --attack tao
-#   python experiments/eval_capabilities_under_attack.py --tasks hellaswag --exits 4 full
+"""Evaluate ordinary tasks with a saved GCG or TAO suffix. Compare with utility_eval.json
+from the same model and prompt format."""
 
 import argparse
 import json

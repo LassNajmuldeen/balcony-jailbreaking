@@ -1,18 +1,5 @@
-# measures the loss on the target compliance string WITHOUT any optimised
-# adversarial suffix. this is the control that tells me whether the shallow exits
-# are genuinely harder to attack, or whether they just start from a higher loss to
-# begin with (spoiler, its mostly the latter).
-#
-# two conditions for each (exit, behavior):
-#   no_suffix_loss  nothing appended at all
-#   filler_loss     GCG's starting suffix ("x x x x ..." x20) with zero
-#                   optimisation steps run on it
-#
-# filler_loss is the one to compare final_loss against, since it holds the prompt
-# length about constant. no_suffix_loss is there to show the filler itself isnt
-# doing any of the work.
-#
-# writes results/baseline_control.json
+"""Measure clean and filler-suffix target loss at each exit. Compare filler_loss with
+attacked final_loss to hold prompt length approximately constant."""
 
 import json
 import sys

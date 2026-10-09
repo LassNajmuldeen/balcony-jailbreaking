@@ -1,19 +1,8 @@
-# checks that a "baseline" checkpoint really is the model the balcony backbone was
-# frozen from (SETUP.md 6, the baseline != full rule).
-#
-# balcony trains with freeze_model=true, so every backbone tensor in the balcony
-# checkpoint has to be bit identical to the stock pretrained model. if they differ
-# then the baseline is the wrong checkpoint and every baseline vs exit comparison
-# in the paper is comparing two unrelated models.
-#
-# it reads tensors straight out of the safetensors shards rather than building the
-# models, so checking an 8B pair costs a few hundred MB of RAM instead of ~32 GB.
-#
-# usage:
-#   python experiments/verify_baseline_weights.py                 # all pairs
-#   python experiments/verify_baseline_weights.py 8b              # just the one
+"""Compare shared checkpoint tensors without loading both models into memory. Exit heads
+are excluded; all shared backbone tensors must match exactly."""
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -128,6 +117,10 @@ def compare(label, balcony_repo, baseline_repo):
 
 
 def main():
+    if os.environ.get("BALCONY_MODEL") and os.environ.get("BASELINE_MODEL"):
+        for label in sys.argv[1:]:
+            if label in PAIRS:
+                PAIRS[label] = (os.environ["BALCONY_MODEL"], os.environ["BASELINE_MODEL"])
     wanted = sys.argv[1:] or list(PAIRS)
     results = {}
     for label in wanted:

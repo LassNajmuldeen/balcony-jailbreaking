@@ -1,7 +1,5 @@
-# proof of concept script from phase 1. just checks that the whole
-# pipeline (model loading, wrapping, GCG attack) actually works before
-# i committed to the full experiment. attacks exit 12 only, 2 behaviors,
-# 60 steps. none of these results feed into RESULTS.md.
+"""Small GCG diagnostic for the early-exit model. For a configurable pilot, use
+scripts/run.py experiment with a small behavior and step budget."""
 
 import sys
 _REPO = Path(__file__).resolve().parent.parent

@@ -1,18 +1,6 @@
-"""Publication assets for the Balcony paper, matched to the paper's LaTeX template.
-
-Figures are written to paper_figures/ with the numbered names the .tex expects, as
-vector PDF (for \\includegraphics) plus a PNG preview. Tables are written to
-paper_tables/ as booktabs LaTeX in the template's style, and a single combined
-snippet (paper_snippet.tex) collects every figure and table block with its caption.
-
-Everything covers all three models (1B, 7B, 8B) and always shows the no-balcony
-baseline alongside the full model. Attack numbers (loss + ASR) route through
-export_results.collect(), the same path as results_table.*, so nothing can disagree.
-Torch-free, safe while TAO owns the GPU.
-
-usage:
-  AdversariaLLM/.venv/bin/python experiments/make_paper_assets.py
-"""
+"""Build PNG/PDF figures and LaTeX tables from the archived result sets. Uses the same
+attack and ASR aggregation as export_results.py. Requires NumPy and Matplotlib; no GPU
+is needed."""
 
 import json
 import sys
@@ -41,7 +29,7 @@ LAYERS = {"1b": 16, "7b": 32, "8b": 32}
 EXIT_ORDER = {"1b": ["4", "8", "12", "full", "no_balcony"],
               "7b": ["15", "18", "21", "full", "no_balcony"],
               "8b": ["15", "18", "21", "full", "no_balcony"]}
-RESULTS_DIR = {"1b": "results", "7b": "results_7b", "8b": "results_8b"}
+RESULTS_DIR = {name: spec["dir"] for name, spec in er.MODELS.items()}
 BALCONY_FILE = {"harmbench": "phase2_attacks.json", "advbench": "advbench_attacks.json"}
 BASELINE_FILE = {"harmbench": "no_balcony_attacks.json",
                  "advbench": "gcg_no_balcony_advbench_attacks.json"}

@@ -107,15 +107,14 @@ def complete_output(src, out):
 
 
 def load_model(model_id, is_baseline):
-    """mirrors the loaders in attack_gcg_advbench.py and attack_gcg_baseline.py.
+    """Use the same model wrapping as attack_gcg.py.
 
     the two arms need DIFFERENT wrapping and getting it wrong is a hard crash:
     wrap_for_single_exit reads config.output_exit_layers, which only a NestedLlama
     balcony checkpoint has, so calling it on the stock 7B/8B baselines raises
     AttributeError. the 1B baseline IS nested (with exit_layer_indices=[]) and
     needs wrap_plain_model to unwrap its 1-element forward; the 7B/8B baselines are
-    stock HF llama and must be left completely alone. see
-    attack_gcg_baseline.py:72-79 -- the same trap, already documented there.
+    stock HF llama and must be left completely alone.
     """
     tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)
     tok = ensure_chat_template(tok)

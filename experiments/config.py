@@ -1,47 +1,22 @@
-# one place that says what a run is actually pointed at: which balcony
-# checkpoint, which exits, which baseline, and where the results land. every
-# script in experiments/ imports from here instead of keeping its own copy of the
-# same constants, so moving the suite from 1B to 7B/8B is an env var change and
-# not an edit in ten files (SETUP.md 8.1).
-#
-# there are no 1B defaults anymore (2026-09-14). the 1B is out of scope and its
-# checkpoints, plus the stock baselines, got deleted from the HF cache, so a script
-# that quietly fell back to them would just redownload the wrong model. now
-# BALCONY_MODEL has to be set and there is no seperate baseline unless you ask.
-#
-# a normal run:
-#   BALCONY_MODEL=parsakaveh/Balcony-LLaMA2-7B \
-#   RESULTS_DIR=results_7b \
-#     ./AdversariaLLM/.venv/bin/python experiments/<script>.py
-#
-# the old 1B setup needs all of it spelled out:
-#   BALCONY_MODEL=parsakaveh/Balcony-LLM-1B BASELINE_MODEL=parsakaveh/LLM-1B-Pretrained \
-#   EXITS="4 8 12 full" RESULTS_DIR=results
+"""Shared run settings. Paths are relative to the repository unless absolute.
+
+The public runner sets these variables explicitly. Direct module use requires
+BALCONY_MODEL; a separate baseline is loaded only when BASELINE_MODEL is set.
+"""
 
 import os
 import re
 from pathlib import Path
 
-# repo root worked out from where this file lives, so no script has to carry an
-# absolute path anymore (SETUP.md 7, this is the thing that used to need a sed
-# over every file each time the repo moved)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# the AdversariaLLM checkout. it holds the venv and the behavior/target datasets.
-# the attack scripts call this one ROOT.
 ROOT = str(PROJECT_ROOT / "AdversariaLLM")
 
-# where the behaviour csvs and target jsons live. defaults to ROOT, which is where
-# they sit in a normal checkout, so nothing changes here. it is seperate from ROOT
-# because the portable cluster bundle ships the four data files WITHOUT shipping a
-# whole AdversariaLLM tree, and then the data is next to the code instead of
-# under AdversariaLLM/ (see scripts/make_cluster_bundle.sh).
 DATA_ROOT = os.environ.get("DATA_ROOT") or ROOT
 
 
 def _env_str(name, default):
     raw = os.environ.get(name)
-    # empty string counts as unset, otherwise EXITS="" would blow up _parse_exits
     return raw if raw else default
 
 
@@ -56,148 +31,68 @@ def _env_float(name, default):
 
 
 def _parse_exits(raw):
-    """turns '15 18 21 full' into [15, 18, 21, 'full'].
-
-    the ints have to stay ints because the model code indexes hidden states with
-    them. 'full' stays a string, its just a sentinel for the deepest exit.
-    """
+    """Parse integer layer indices and the full-depth sentinel."""
     parsed = []
     for piece in raw.replace(",", " ").split():
         parsed.append(piece if piece == "full" else int(piece))
     return parsed
 
 
-# --- what we are attacking ------------------------------------------------
-
-# the balcony (early exit) checkpoint under attack. no default on purpose. when the
-# env var is unset this name just isnt defined, so `from config import
-# BALCONY_MODEL` lands in __getattr__ at the bottom of this file and stops with a
-# message saying what to set. scripts that never load a model (judge, merge, the
-# figures) dont import it and keep working without it
 if os.environ.get("BALCONY_MODEL"):
     BALCONY_MODEL = os.environ["BALCONY_MODEL"]
 
-# the old weight matched, NON balcony control. OFF by default now. the trunk turned
-# out bitwise identical to the 'full' exit (291/291 tensors on 7B and 8B) so 'full'
-# IS the baseline, and the stock checkpoints are gone from the HF cache. only set
-# this to rerun an old no_balcony arm, and expect a 13 to 15G download when you do
 BASELINE_MODEL = os.environ.get("BASELINE_MODEL") or None
 
 
 def require_baseline_model():
-    """BASELINE_MODEL, or a clear stop when it isnt set.
-
-    for the code paths that only make sense with the seperate stock checkpoint.
-    without this they call from_pretrained(None) and die somewhere deep inside
-    transformers with an error that tells you nothing.
-    """
+    """Require an explicitly selected separate baseline checkpoint."""
     if not BASELINE_MODEL:
-        raise SystemExit(
-            "this needs the separate baseline checkpoint but BASELINE_MODEL is not set.\n"
-            "  'full' is the baseline now, so you most likely want to leave this arm out.\n"
-            "  to run it anyway set BASELINE_MODEL=NousResearch/Llama-2-7b-hf (7B) or\n"
-            "  BASELINE_MODEL=NousResearch/Meta-Llama-3-8B (8B), both redownload 13-15G."
-        )
+        raise SystemExit("Set BASELINE_MODEL to use a separate baseline checkpoint.")
     return BASELINE_MODEL
 
 
-# the backbone layers the balcony heads hang off of, plus 'full' for the deepest
-# exit. defaults to the 7B/8B layout since those are the only models in scope.
-# 1B was [4, 8, 12, 'full'] (16 layers), 7B/8B are [15, 18, 21, 'full'] (32 layers)
 EXITS = _parse_exits(_env_str("EXITS", "15 18 21 full"))
 
-# the exits plus the no_balcony arm, but that arm is only in here when a baseline
-# model was actually asked for. otherwise the utility evals would go and load it
 ALL_EXITS = (["no_balcony"] if BASELINE_MODEL else []) + EXITS
 
-# --- where results go -----------------------------------------------------
 
-# relative names get resolved under the repo root, thats what makes
-# RESULTS_DIR=results_7b work from anywhere
 _results = Path(_env_str("RESULTS_DIR", "results"))
 RESULTS_DIR = _results if _results.is_absolute() else PROJECT_ROOT / _results
-RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 FIG_DIR = RESULTS_DIR / "figures"
 
-# --- attack hyperparameters ----------------------------------------------
-# these are kept identical across attacks and model sizes, otherwise the
-# comparison isnt fair (SETUP.md 8.2). N_BEHAVIORS is env overridable mostly so a
-# pilot run can do 2 behaviors and finish in a minute.
 
 N_BEHAVIORS = _env_int("N_BEHAVIORS", 50)
 NUM_STEPS = _env_int("NUM_STEPS", 150)
 
-# which SLICE of the benchmark this process attacks, as a half open [start, end).
-# the parallel queue shards by behavior range now and not just by exit, because at
-# 500 steps one 50 behavior shard is over two days and a pool whose smallest unit
-# is two days spends its whole tail with one worker running alone.
-#
-# behavior_idx stays the GLOBAL index either way (behavior_datasets truncates from
-# the front with iloc[:n], so behavior 37 is the same behavior no matter what the
-# slice is), which is what lets merge_tao_shards fold the pieces back together
-# without knowing shards exist. it already dedupes on behavior_idx.
-#
-# defaults to the whole [0, N_BEHAVIORS) run, so every existing script that never
-# sets these behaves exactly as it did before.
 BEHAVIOR_START = _env_int("BEHAVIOR_START", 0)
 BEHAVIOR_END = _env_int("BEHAVIOR_END", N_BEHAVIORS)
 
-# how long the completions we hand to the judge are allowed to be. harmbench
-# mandates 512 ("We use max_new_tokens=512 for all experiments",
-# docs/evaluation_pipeline.md). we ran 256 (AdversariaLLM's GCGConfig default) and
-# 200 (TAO) up until 2026-08-11, which cut off 72 to 100% of the completions mid
-# sentence and therefore undercounts ASR.
 MAX_NEW_TOKENS = _env_int("MAX_NEW_TOKENS", 512)
 
-# GCG
 SEARCH_WIDTH = _env_int("SEARCH_WIDTH", 128)
 TOPK = _env_int("TOPK", 64)
 
-# TAO. heavier per step than GCG because of the two stage forward
 TAO_BATCH_SIZE = _env_int("TAO_BATCH_SIZE", 128)
 TAO_TOPK = _env_int("TAO_TOPK", 256)
 TAO_ALPHA = _env_float("TAO_ALPHA", 0.2)
 
-# --- optional per process GPU memory cap (for running cells in parallel) ------
-# one 7B GCG process reserves about 81 GB of the 98 GB card even though the live
-# tensors are nowhere near that. thats pytorch's caching allocator grabbing freed
-# blocks and never giving them back. harmless when one job owns the GPU, fatal
-# when three do, because the first process starves the others before they even
-# finish loading.
-#
-# GPU_MEM_FRACTION caps *this* process's share so a few of them can coexist. its
-# opt in and unset by default so every existing single job script behaves exactly
-# like it always did. do not give this a default value.
-#
-#   GPU_MEM_FRACTION=0.30   about 29 GB, which i measured to be comfortably above
-#                           the ~25 GB live footprint of a 7B GCG cell
 GPU_MEM_FRACTION = _env_float("GPU_MEM_FRACTION", 0.0)
 
 if GPU_MEM_FRACTION > 0:
-    # imported lazily, the whole point is that scripts which dont need a GPU
-    # (merge, export) can still import config without paying for torch
     import torch
 
     if torch.cuda.is_available():
         torch.cuda.set_per_process_memory_fraction(GPU_MEM_FRACTION)
 
-# --- which benchmark, which arm -------------------------------------------
 
-# "harmbench" or "advbench". behavior_datasets.py maps these onto files
 BENCHMARK = _env_str("BENCHMARK", "harmbench")
 
-# "balcony" attacks BALCONY_MODEL one exit at a time. "baseline" attacks the
-# seperate weight matched non balcony checkpoint as a single arm.
 ATTACK_TARGET = _env_str("ATTACK_TARGET", "balcony")
 
 
 def result_filename(attack, target=None, benchmark=None):
-    """the results filename for one (attack, arm, benchmark) combination.
-
-    the four original 1B outputs keep their old names so the results already on
-    disk and the figure scripts carry on working. anything new gets suffixed.
-    """
+    """Resolve an output name while preserving the archived file conventions."""
     target = target or ATTACK_TARGET
     benchmark = benchmark or BENCHMARK
     legacy = {
@@ -213,8 +108,6 @@ def result_filename(attack, target=None, benchmark=None):
     return f"{attack}{arm}_{benchmark}_attacks.json"
 
 
-# stable labels for those same four original 1B outputs. the figure scripts key
-# off "harmbench_gcg" and "baseline_gcg" so these must not drift.
 JUDGE_LABELS = {
     "phase2_attacks.json": "harmbench_gcg",
     "advbench_attacks.json": "advbench_gcg",
@@ -224,84 +117,43 @@ JUDGE_LABELS = {
 
 
 def judge_label(filename):
-    """the label judge_scores.json should use for one *_attacks.json file.
-
-    regen_completions.py writes <name>_512.json, so the length suffix gets
-    stripped first. without that the label drifts to "phase2_attacks_512.json"
-    and the figure scripts, which look for "harmbench_gcg", quietly find nothing
-    at all.
-    """
+    """Use the same judge label for original and regenerated completions."""
     stem = re.sub(r"_(\d+)\.json$", ".json", filename)
     return JUDGE_LABELS.get(stem, stem.replace("_attacks.json", ""))
 
 
-# --- judging --------------------------------------------------------------
-# which classifier, which completion field, which files. all env driven so the
-# same script can score the 512 token completions and then their 256 token
-# truncations without me editing code in between the two passes.
-#
-# JUDGE_CLASSIFIER: "llama-2-13b" is the classifier harmbench reports its results
-# with, so thats the default now. "mistral-7b" is the *validation* classifier we
-# used up to 2026-08-11, kept around so the old numbers can still be reproduced.
 JUDGE_CLASSIFIER = _env_str("JUDGE_CLASSIFIER", "llama-2-13b")
 COMPLETION_FIELD = _env_str("COMPLETION_FIELD", "own_exit_completion")
 COMPLETION_GLOB = _env_str("COMPLETION_GLOB", "*attacks*.json")
 JUDGE_OUTPUT = _env_str("JUDGE_OUTPUT", "judge_scores.json")
 
 
-# --- chat template --------------------------------------------------------
-# balcony 7B/8B sit on top of *base* llama checkpoints, which ship no chat
-# template at all, and the third party 8B upload didnt carry one over either.
-# AdversariaLLM's prepare_conversation() calls tokenizer.apply_chat_template(),
-# so a missing template is a hard crash and not a silent default.
-#
-# the rule that actually matters for the science: a baseline has to use the SAME
-# template as the balcony model its being compared to, otherwise "baseline vs
-# exit" is measuring prompt formatting rather than the early exit machinery.
-#
-#   1B  balcony + baseline : both already ship ChatML       so leave them alone
-#   7B  balcony            : ships llama-2-chat
-#   7B  baseline           : bare, give it "llama-2-chat" (renders byte identical)
-#   8B  balcony + baseline : both bare, give them "llama-3-balcony"
-#
-# "llama-3-balcony" is the llama-3 header format lifted from Balcony-LLaMA's own
-# experiment configs. it is deliberately NOT AdversariaLLM's "llama-3-instruct",
-# which injects a default system prompt ("You are a helpful assistant" plus a
-# knowledge cutoff line) that neither the 1B nor the 7B template adds. that
-# asymmetry would confound the cross model comparison.
 CHAT_TEMPLATE = _env_str("CHAT_TEMPLATE", "")
 
 
 def resolve_chat_template(name):
-    """look in the repo's own chat_templates/ first, then fall back to the ones
-    AdversariaLLM ships."""
+    """Find a template here, then in AdversariaLLM."""
     local = PROJECT_ROOT / "chat_templates" / f"{name}.jinja"
     if local.exists():
         return local.read_text()
-    # imported down here because the repo local file usually wins and importing
-    # adversariallm at module import time drags in a lot for no reason
     from adversariallm.io_utils import load_chat_template
 
     return load_chat_template(name)
 
 
 def ensure_chat_template(tokenizer):
-    """apply CHAT_TEMPLATE if the run asked for one. does nothing when its unset,
-    so the 1B path keeps using whatever the checkpoint came with."""
+    """Apply the selected template, or keep the checkpoint template."""
     if CHAT_TEMPLATE:
         tokenizer.chat_template = resolve_chat_template(CHAT_TEMPLATE)
     return tokenizer
 
-
-# --- benchmark data -------------------------------------------------------
 
 HARMBENCH_MESSAGES = f"{DATA_ROOT}/data/behavior_datasets/harmbench_behaviors_text_all.csv"
 HARMBENCH_TARGETS = f"{DATA_ROOT}/data/optimizer_targets/harmbench_targets_text.json"
 
 
 def describe():
-    """one line banner so every log actually says what it was run against. worth
-    the two lines of code, i have lost hours to logs that didnt."""
+    """Describe the model, exits, output directory, and attack budget."""
     return (
         f"balcony={globals().get('BALCONY_MODEL', 'unset')} baseline={BASELINE_MODEL} "
         f"exits={EXITS} results={RESULTS_DIR} "
@@ -310,11 +162,9 @@ def describe():
 
 
 def __getattr__(name):
-    # python only calls this for names the module doesnt define, so in practice it
-    # only fires for BALCONY_MODEL when the env var was left unset (see the top)
     if name == "BALCONY_MODEL":
         raise ImportError(
-            "BALCONY_MODEL is not set and there is no default anymore. e.g.\n"
+            "BALCONY_MODEL is required. For example:\n"
             "  BALCONY_MODEL=parsakaveh/Balcony-LLaMA2-7B RESULTS_DIR=results_7b\n"
             "  BALCONY_MODEL=adpretko/Balcony-Meta-LLaMA3-8B-exit-15-18-21 RESULTS_DIR=results_8b"
         )

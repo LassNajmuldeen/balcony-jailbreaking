@@ -1,10 +1,6 @@
-"""Rebuild the published depth artifact from the verified numbers.
+"""Build a standalone HTML view from asr.json, util.json, loss.json, and mcnemar.json.
+Recompute those inputs when the archived result sets change."""
 
-Everything on the page comes from the four scratchpad JSONs, which were computed
-straight off results*/judge_scores.json and results*/*attacks*.json. Nothing is
-typed in by hand, so the page cannot drift from the tables the way the 2026-08-05
-version did.
-"""
 import json
 from pathlib import Path
 

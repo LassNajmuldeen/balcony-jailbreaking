@@ -1,94 +1,63 @@
-# adversarial-balcony
+# Jailbreaks across model depth
 
-investigating adversarial robustness across early-exit points in a balcony-style language model. this is the experiment repo for our NeurIPS workshop paper.
+How does early exit change a language model's vulnerability to jailbreaks?
+We test GCG and TAO attacks at different depths of Balcony models, then measure
+attack success, transfer between exits, and performance on ordinary tasks.
 
-## overview
+The recorded experiments cover 1B, LLaMA 2 7B, and LLaMA 3 8B checkpoints on
+HarmBench and AdvBench. [Results and data notes](RESULTS.md).
 
-balcony models add prediction heads ("exits") at intermediate transformer layers so the model can output predictions before all layers have finished processing. we attack each exit independently with GCG and TAO, measure how attack success varies with exit depth, and whether attacks transfer between exits.
+## Figures
 
-**models**:
-- `parsakaveh/Balcony-LLM-1B` -- 1B param SmolLM with exit heads at layers 4, 8, 12, and the full model output at layer 16
-- `parsakaveh/LLM-1B-Pretrained` -- same architecture, no exit heads. all shared weights are bit-identical to the balcony model
+Attack success across exits and models:
 
-**attacks**:
-- GCG (Greedy Coordinate Gradient), 150 steps, 50 HarmBench behaviors
-- TAO (Two-stage loss + Direction-Priority Token Optimization), 150 steps, 50 HarmBench behaviors
+![GCG attack success rates on HarmBench and AdvBench](paper_figures/01_asr_bar.png)
 
-**benchmarks**:
-- HarmBench (50 behaviors) -- standard adversarial robustness
-- AdvBench (50 behaviors) -- additional adversarial benchmark
-- Utility: hellaswag, arc_challenge, arc_easy, mmlu, winogrande, piqa (via lm-eval)
+Performance on ordinary tasks, before and after adding an attack suffix:
 
-**metrics**: teacher-forced loss, HarmBench judge p_harmful, ASR% (attack success rate)
+![Clean and attacked utility across model depths](paper_figures/04_utility_clean_vs_attacked.png)
 
-## repo structure
+<details>
+<summary>Loss curves and other comparisons</summary>
 
-```
-adapter/
-  balcony_llama/                        # locally vendored model code (avoids trust_remote_code)
-  exit_wrapper.py                       # wraps balcony model to expose one exit at a time
+![GCG loss curves on HarmBench](paper_figures/02_loss_curves_harmbench.png)
+![GCG loss curves on AdvBench](paper_figures/03_loss_curves_advbench.png)
+![Final loss against attack success rate](paper_figures/05_loss_vs_asr.png)
+![HarmBench and AdvBench attack success rates](paper_figures/06_harmbench_vs_advbench.png)
 
-experiments/
-  attack_gcg_harmbench.py           # main experiment: per-exit GCG attack + transfer matrix (HarmBench)
-  attack_gcg_baseline.py                # same GCG attack on the pre-balcony baseline
-  measure_clean_loss.py                   # pre-attack loss measurements (no suffix + filler)
-  judge_harmfulness.py                  # HarmBench judge scoring + ASR% computation
-  transfer_matrix_baseline.py                  # extends transfer matrix with the baseline model
-  attack_gcg_advbench.py                  # GCG attack using AdvBench behaviors
-  attack_tao.py                         # TAO attack on all exits (HarmBench)
-  eval_capabilities.py                       # lm-eval benchmarks per exit (hellaswag, arc, mmlu, etc.)
-  visualize_results.py                  # generates all figures from json results
+</details>
 
-results/                                # raw json data + generated figures
-RESULTS.md                              # full writeup with tables and figures
-```
+These figures use the archived result sets. The 7B template-free reruns are a
+separate variant; see the [data notes](RESULTS.md).
 
-## dependencies
+## Run
 
-clone these repos alongside this one (they are gitignored):
-
-```
-git clone https://github.com/parsakaveh/Balcony-LLaMA.git
-git clone <adversariallm-repo-url> AdversariaLLM
-git clone https://github.com/ZevineXu/TAO-Attack.git
-```
-
-install lm-eval in the AdversariaLLM venv for utility benchmarks:
-```
-uv pip install --python AdversariaLLM/.venv/bin/python lm-eval
-```
-
-## running experiments
-
-all scripts use the AdversariaLLM venv. run with:
-```bash
-AdversariaLLM/.venv/bin/python experiments/<script>.py
-```
+For GPU experiments, follow [setup](SETUP.md), then start with a small run:
 
 ```bash
-# GCG attacks (HarmBench, 50 behaviors, 150 steps)
-python experiments/attack_gcg_harmbench.py    # main attack + transfer matrix
-python experiments/attack_gcg_baseline.py          # baseline attack
-python experiments/measure_clean_loss.py             # pre-attack losses
-
-# AdvBench attacks (50 behaviors, 150 steps)
-python experiments/attack_gcg_advbench.py            # GCG on AdvBench behaviors
-
-# TAO attack (HarmBench, 50 behaviors, 150 steps)
-python experiments/attack_tao.py                   # TAO on all exits
-
-# judge scoring + ASR
-python experiments/judge_harmfulness.py            # judge scoring with ASR%
-
-# utility benchmarks
-python experiments/eval_capabilities.py                 # hellaswag, arc, mmlu, winogrande, piqa
-
-# visualization
-python experiments/visualize_results.py            # regenerate all figures
+.venv/bin/python scripts/run.py experiment --model 7b --stage gcg \
+  --benchmarks harmbench --n-behaviors 2 --num-steps 5 --results-dir runs/pilot
 ```
 
-all experiments were run on a single NVIDIA A4000 (16GB VRAM), Ubuntu, CUDA 12.4.
+Run the complete experiment suite for one model:
 
-## key results
+```bash
+.venv/bin/python scripts/run.py experiment --model 7b
+```
 
-see [RESULTS.md](RESULTS.md) for the full analysis with tables, figures, and ASR% breakdowns.
+New outputs go to `runs/<model>/`. Add `--dry-run` to inspect commands or
+`--help` to see the available stages. [Command reference](scripts/README.md).
+
+## Code and data
+
+| Path | Contents |
+| --- | --- |
+| `adapter/` | Early-exit model code and wrappers |
+| `experiments/` | Attack, evaluation, and analysis implementations |
+| `scripts/` | Setup and the shared command line runner |
+| `results*/` | Recorded outputs, including rerun variants |
+| `paper_figures/`, `paper_tables/` | Figures and exported tables |
+
+The three Git submodules pin [AdversariaLLM](https://github.com/LLM-QC/AdversariaLLM),
+[Balcony-LLaMA](https://github.com/benyaminjami/Balcony-LLaMA), and
+[TAO-Attack](https://github.com/ZevineXu/TAO-Attack). Local toolkit fixes are in `patches/`.

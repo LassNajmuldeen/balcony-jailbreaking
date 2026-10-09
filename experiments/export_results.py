@@ -1,34 +1,23 @@
-# consolidates every finished run into one table: model x attack x benchmark x
-# arm x exit -> mean final loss + ASR%. this is the "add the results" step --
-# it emits markdown (for RESULTS.md), CSV (for analysis) and LaTeX (for the paper)
-# from whatever has finished so far, so it is safe to run while run_matrix.sh is
-# still going.
-#
-# loss comes from the *_attacks.json files, ASR from judge_scores.json. a cell
-# shows "--" when the attack has run but the judge stage has not yet.
-#
-# usage:
-#   python experiments/export_results.py                  # all models, to stdout + files
-#   python experiments/export_results.py --models 7b 8b
-#   python experiments/export_results.py --outdir paper_tables
+"""Export archived attack loss and judge ASR to Markdown, CSV, and LaTeX. Missing scores
+are shown as -- rather than filled in."""
 
 import argparse
 import csv
 import json
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import PROJECT_ROOT, judge_label, result_filename  # noqa: E402
+from models import MODELS as MODEL_PRESETS
 
 # results dir, exit list, backbone depth. relative depth (exit/num_layers) is what
 # makes 1B's 4/8/12-of-16 comparable with 7B/8B's 15/18/21-of-32.
-MODELS = {
-    "1b": {"dir": "results", "exits": [4, 8, 12, "full"], "layers": 16},
-    "7b": {"dir": "results_7b", "exits": [15, 18, 21, "full"], "layers": 32},
-    "8b": {"dir": "results_8b", "exits": [15, 18, 21, "full"], "layers": 32},
-}
+MODELS = {name: {"dir": os.environ.get(f"RESULTS_DIR_{name.upper()}") or spec.results,
+                 "exits": list(spec.exits), "layers": spec.layers}
+          for name, spec in MODEL_PRESETS.items()}
 
 ATTACKS = ["gcg", "tao"]
 ARMS = ["balcony", "baseline"]
@@ -172,7 +161,7 @@ def main():
 
     rows = collect(args.models)
     if not rows:
-        print("no results found yet -- nothing finished. run ./run_matrix.sh --status")
+        print("no results found yet -- nothing finished. run ./scripts/run.py experiment --status")
         return 1
 
     outdir = PROJECT_ROOT / args.outdir
@@ -183,7 +172,7 @@ def main():
     (outdir / "results_table.md").write_text(md + "\n")
 
     with open(outdir / "results_table.csv", "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
 
