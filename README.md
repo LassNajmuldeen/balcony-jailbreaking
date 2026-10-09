@@ -75,7 +75,4 @@ Use `--dry-run` to inspect commands without loading models.
 Raw archives and older exports are not synchronized with the paper. Keep 7B
 runs with and without chat templates separate.
 
-`results/paper/` and `results/archive/` are public. New runs in `results/runs/`
-and regenerated exports in `results/generated/` are ignored by Git.
-
 Dependencies are pinned in `.gitmodules`; toolkit fixes are in `patches/`.
