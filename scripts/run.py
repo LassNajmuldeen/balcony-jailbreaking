@@ -67,10 +67,12 @@ def parser():
     run.add_argument("--classifier", choices=("llama-2-13b", "mistral-7b"), default="llama-2-13b")
     run.add_argument("--resume", action="store_true", help="skip attack stages completed with the same settings")
     for name in ("figures", "export"):
-        sub = commands.add_parser(name, help=f"inspect historical {name}")
+        sub = commands.add_parser(name, help="extract paper figures" if name == "figures" else "inspect historical exports")
         sub.add_argument("--archive", action="store_true",
                          help="explicitly use superseded inputs, including 1B development runs")
-        if name == "export":
+        if name == "figures":
+            sub.add_argument("--paper", type=Path, help="extract the published figures and tables from a local paper PDF")
+        else:
             sub.add_argument("--loss-curves", action="store_true", help="also export the corrected GCG curves")
     for sub in (run, *[commands.choices[n] for n in ("figures", "export")]):
         sub.add_argument("--dry-run", action="store_true", help="show commands without running them")
@@ -85,11 +87,17 @@ def result_name(attack, target, benchmark):
 
 def plan(args):
     """Return (stage name, script, arguments, environment) in execution order."""
-    if args.command in ("figures", "export") and not args.archive:
-        raise ValueError("current figure sources are not reconciled; use --archive only to inspect historical outputs")
     if args.command == "figures":
-        return [("paper-figures", "make_paper_assets.py", [], {})]
+        if args.paper and args.archive:
+            raise ValueError("choose --paper or --archive")
+        if args.paper:
+            return [("paper-figures", "extract_paper_assets.py", [str(args.paper.resolve())], {})]
+        if not args.archive:
+            raise ValueError("select --paper PDF for published figures or --archive for historical outputs")
+        return [("archived-figures", "make_paper_assets.py", [], {})]
     if args.command == "export":
+        if not args.archive:
+            raise ValueError("use --archive to inspect historical exports; published results are in RESULTS.md")
         jobs = [("tables", "export_results.py", [], {}),
                 ("csv", "export_paper_csv.py", [], {})]
         if args.loss_curves:

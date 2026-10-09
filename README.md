@@ -28,8 +28,21 @@ New outputs go to `runs/<model>/`. Use `--dry-run` to inspect commands.
 
 ## Results
 
-The old figures have been removed from this README while the current plots and
-their data sources are reconciled. [Result status](RESULTS.md).
+The paper evaluates GCG over 150 steps on 50 behaviors per benchmark.
+The figures below are extracted directly from the paper. [Results and tables](RESULTS.md).
+
+![Evaluation pipeline with early exits at layers 15, 18, 21, and full depth.](paper_figures/published/pipeline.png)
+
+![GCG attack success rates by exit depth for the 7B and 8B models on HarmBench and AdvBench.](paper_figures/published/attack_success.png)
+
+<details>
+<summary>Loss curves and loss versus attack success</summary>
+
+![GCG loss over 150 steps, by model, benchmark, and exit depth.](paper_figures/published/loss_curves.png)
+
+![Final GCG loss versus attack success rate on HarmBench.](paper_figures/published/loss_vs_asr.png)
+
+</details>
 
 ## Repository
 
@@ -39,7 +52,9 @@ their data sources are reconciled. [Result status](RESULTS.md).
 | `experiments/` | Attack, evaluation, and analysis implementations |
 | `scripts/` | Setup and the shared runner |
 | `results*/` | Historical run artifacts; not a release of validated study results |
-| `paper_figures/`, `paper_tables/` | Historical exports, superseded by the current analysis |
+| `paper_figures/published/`, `paper_tables/published/` | Figures and tables extracted from the paper |
+
+Other files in `paper_figures/` and `paper_tables/` are historical exports.
 
 The Git submodules pin [AdversariaLLM](https://github.com/LLM-QC/AdversariaLLM),
 [Balcony-LLaMA](https://github.com/benyaminjami/Balcony-LLaMA), and

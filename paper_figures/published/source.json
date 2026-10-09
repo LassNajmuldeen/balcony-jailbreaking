@@ -1,0 +1,91 @@
+{
+  "paper_title": "Exploring Jailbreak Vulnerability Across Depth-Based Dynamic Inference in Large Language Models",
+  "source_sha256": "12dda075aac23b5d91c7ea507be7fc30b344b5e44e03c8bde6eb6580416e84bf",
+  "render_dpi": 240,
+  "assets": [
+    {
+      "kind": "figure",
+      "number": 1,
+      "page": 2,
+      "crop_at_120_dpi": [
+        180,
+        670,
+        660,
+        255
+      ],
+      "output": "paper_figures/published/loss_vs_asr.png"
+    },
+    {
+      "kind": "figure",
+      "number": 2,
+      "page": 5,
+      "crop_at_120_dpi": [
+        202,
+        496,
+        616,
+        273
+      ],
+      "output": "paper_figures/published/pipeline.png"
+    },
+    {
+      "kind": "figure",
+      "number": 3,
+      "page": 6,
+      "crop_at_120_dpi": [
+        185,
+        462,
+        655,
+        304
+      ],
+      "output": "paper_figures/published/attack_success.png"
+    },
+    {
+      "kind": "figure",
+      "number": 4,
+      "page": 7,
+      "crop_at_120_dpi": [
+        180,
+        115,
+        690,
+        460
+      ],
+      "output": "paper_figures/published/loss_curves.png"
+    },
+    {
+      "kind": "table",
+      "number": 1,
+      "page": 5,
+      "crop_at_120_dpi": [
+        180,
+        126,
+        665,
+        345
+      ],
+      "output": "paper_tables/published/model_configuration.png"
+    },
+    {
+      "kind": "table",
+      "number": 2,
+      "page": 7,
+      "crop_at_120_dpi": [
+        180,
+        746,
+        665,
+        264
+      ],
+      "output": "paper_tables/published/utility_clean.png"
+    },
+    {
+      "kind": "table",
+      "number": 3,
+      "page": 8,
+      "crop_at_120_dpi": [
+        180,
+        127,
+        665,
+        287
+      ],
+      "output": "paper_tables/published/utility_attacked.png"
+    }
+  ]
+}

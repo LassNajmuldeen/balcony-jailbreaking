@@ -39,7 +39,19 @@ TAO is a planned extension. The code can be exercised explicitly with
 `--stage tao`; existing checkpoints do not establish validated study results.
 For attacked utility with a TAO suffix, use `--stage utility-attacked --attack tao`.
 
-## Historical figures and exports
+## Paper figures and historical exports
+
+Extract the paper figures and tables with Poppler installed:
+
+```bash
+python3 scripts/run.py figures --paper /path/to/paper.pdf
+```
+
+Crops go to `paper_figures/published/` and `paper_tables/published/`.
+The PDF remains local; the source manifest records its hash and crop coordinates.
+The crop layout is specific to the ten-page paper supplied for this study.
+
+To inspect older exports:
 
 ```bash
 .venv/bin/python scripts/run.py figures --archive
@@ -47,8 +59,8 @@ For attacked utility with a TAO suffix, use `--stage utility-attacked --attack t
 .venv/bin/python scripts/run.py export --archive --loss-curves
 ```
 
-The `--archive` flag is required to avoid presenting these outputs as current.
-Figures go to `paper_figures/`; tables and CSVs go to `paper_tables/`.
+The `--archive` flag selects historical inputs. Figures go to `paper_figures/`;
+tables and CSVs go to `paper_tables/`, outside the `published/` directories.
 These commands reproduce historical artifacts, including the old 1B tests and
 unvalidated TAO outputs. They do not regenerate the current study figures.
 The optional loss-curve export uses the corrected template-free 7B reruns.

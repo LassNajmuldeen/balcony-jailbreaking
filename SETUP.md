@@ -44,7 +44,19 @@ The full-depth exit is included in every preset. A separate stock checkpoint is
 optional: select it with `--target baseline --baseline-model <checkpoint>`.
 Use the same prompt template for comparisons between checkpoints.
 
-## Historical figures only
+## Paper figures
+
+The README uses figures extracted from the paper. To refresh them from a local
+copy, install [Poppler](https://poppler.freedesktop.org/) (`pdftoppm`), then run:
+
+```bash
+python3 scripts/run.py figures --paper /path/to/paper.pdf
+```
+
+This extracts the four figures and three tables from the study's ten-page layout.
+The PDF stays local. Only the crops and a source hash are written to `published/`.
+
+## Historical figures
 
 The old plot generator reproduces historical artifacts, not the current paper
 figures. It needs no GPU or model downloads:

@@ -68,10 +68,19 @@ class RunnerTests(unittest.TestCase):
     def test_historical_exports_require_explicit_selection(self):
         for command in ("figures", "export"):
             args = runner.parser().parse_args([command])
-            with self.assertRaisesRegex(ValueError, "not reconciled"):
+            with self.assertRaisesRegex(ValueError, "--archive"):
                 runner.plan(args)
             args = runner.parser().parse_args([command, "--archive"])
             self.assertTrue(runner.plan(args))
+
+    def test_paper_figures_are_separate_from_archived_exports(self):
+        args = runner.parser().parse_args(["figures", "--paper", "paper.pdf"])
+        jobs = runner.plan(args)
+        self.assertEqual(jobs[0][1], "extract_paper_assets.py")
+        self.assertEqual(jobs[0][2], [str(Path("paper.pdf").resolve())])
+        args.archive = True
+        with self.assertRaisesRegex(ValueError, "choose --paper or --archive"):
+            runner.plan(args)
 
     def test_attack_completeness_checks(self):
         with tempfile.TemporaryDirectory() as temp:
