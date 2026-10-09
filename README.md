@@ -8,6 +8,24 @@ TAO is a planned extension. Its implementation is experimental; we do not report
 validated TAO results. The earlier 1B runs were development tests and are outside
 the current study.
 
+## Results
+
+The paper evaluates GCG over 150 steps on 50 behaviors per benchmark.
+The figures below are extracted directly from the paper. [Results and tables](RESULTS.md).
+
+![Evaluation pipeline with early exits at layers 15, 18, 21, and full depth.](paper_figures/published/pipeline.png)
+
+![GCG attack success rates by exit depth for the 7B and 8B models on HarmBench and AdvBench.](paper_figures/published/attack_success.png)
+
+<details open>
+<summary>Loss curves and loss versus attack success</summary>
+
+![GCG loss over 150 steps, by model, benchmark, and exit depth.](paper_figures/published/loss_curves.png)
+
+![Final GCG loss versus attack success rate on HarmBench.](paper_figures/published/loss_vs_asr.png)
+
+</details>
+
 ## Run
 
 Follow [setup](SETUP.md), then start with a small GCG run:
@@ -25,24 +43,6 @@ The default pipeline runs GCG, judging, and utility evaluation for one model:
 
 New outputs go to `runs/<model>/`. Use `--dry-run` to inspect commands.
 [Command reference](scripts/README.md).
-
-## Results
-
-The paper evaluates GCG over 150 steps on 50 behaviors per benchmark.
-The figures below are extracted directly from the paper. [Results and tables](RESULTS.md).
-
-![Evaluation pipeline with early exits at layers 15, 18, 21, and full depth.](paper_figures/published/pipeline.png)
-
-![GCG attack success rates by exit depth for the 7B and 8B models on HarmBench and AdvBench.](paper_figures/published/attack_success.png)
-
-<details>
-<summary>Loss curves and loss versus attack success</summary>
-
-![GCG loss over 150 steps, by model, benchmark, and exit depth.](paper_figures/published/loss_curves.png)
-
-![Final GCG loss versus attack success rate on HarmBench.](paper_figures/published/loss_vs_asr.png)
-
-</details>
 
 ## Repository
 
