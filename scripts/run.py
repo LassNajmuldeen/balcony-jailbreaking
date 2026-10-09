@@ -13,7 +13,7 @@ import sys
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "experiments"))
-from models import MODELS
+from models import MODELS, ACTIVE_MODELS
 
 STAGES = ("all", "gcg", "tao", "control", "judge", "utility",
           "utility-attacked", "regenerate", "merge", "transfer", "verify-weights")
@@ -41,8 +41,11 @@ def parser():
     ap.add_argument("--python", default=sys.executable, help="interpreter for worker processes")
     commands = ap.add_subparsers(dest="command", required=True)
     run = commands.add_parser("experiment", help="run one model, or one stage")
-    run.add_argument("--model", choices=MODELS, required=True)
-    run.add_argument("--stage", choices=STAGES, default="all")
+    run.add_argument("--model", choices=ACTIVE_MODELS, required=True)
+    run.add_argument("--stage", choices=STAGES, default="all",
+                     help="all runs GCG only; tao is an experimental extension")
+    run.add_argument("--attack", choices=("gcg", "tao"), default="gcg",
+                     help="suffix for utility-attacked (TAO is experimental)")
     run.add_argument("--benchmarks", nargs="+", choices=("harmbench", "advbench"),
                      default=["harmbench", "advbench"])
     run.add_argument("--target", choices=("balcony", "baseline"), default="balcony")
@@ -64,7 +67,9 @@ def parser():
     run.add_argument("--classifier", choices=("llama-2-13b", "mistral-7b"), default="llama-2-13b")
     run.add_argument("--resume", action="store_true", help="skip attack stages completed with the same settings")
     for name in ("figures", "export"):
-        sub = commands.add_parser(name, help=f"rebuild {name} from recorded results")
+        sub = commands.add_parser(name, help=f"inspect historical {name}")
+        sub.add_argument("--archive", action="store_true",
+                         help="explicitly use superseded inputs, including 1B development runs")
         if name == "export":
             sub.add_argument("--loss-curves", action="store_true", help="also export the corrected GCG curves")
     for sub in (run, *[commands.choices[n] for n in ("figures", "export")]):
@@ -80,6 +85,8 @@ def result_name(attack, target, benchmark):
 
 def plan(args):
     """Return (stage name, script, arguments, environment) in execution order."""
+    if args.command in ("figures", "export") and not args.archive:
+        raise ValueError("current figure sources are not reconciled; use --archive only to inspect historical outputs")
     if args.command == "figures":
         return [("paper-figures", "make_paper_assets.py", [], {})]
     if args.command == "export":
@@ -133,14 +140,14 @@ def plan(args):
         add("control", "measure_clean_loss", BENCHMARK="harmbench")
     for benchmark in dict.fromkeys(args.benchmarks):
         for attack in ("gcg", "tao"):
-            if args.stage in ("all", attack):
+            if args.stage == attack or (args.stage == "all" and attack == "gcg"):
                 add(f"{attack}-{benchmark}", f"attack_{attack}", BENCHMARK=benchmark)
     if args.stage in ("all", "judge"):
         add("judge", "judge_harmfulness")
     if args.stage in ("all", "utility"):
         add("utility", "eval_capabilities", ["--exits", "no_balcony"] if args.target == "baseline" else [])
     if args.stage in ("all", "utility-attacked"):
-        for attack in ("gcg", "tao"):
+        for attack in (["gcg"] if args.stage == "all" else [args.attack]):
             argv = ["--attack", attack, "--suffix-benchmark", args.benchmarks[0]]
             if args.target == "baseline":
                 argv += ["--exits", "no_balcony"]

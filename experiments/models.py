@@ -22,3 +22,6 @@ MODELS = {
                     "NousResearch/Meta-Llama-3-8B", (15, 18, 21, "full"),
                     32, "llama-3-balcony", "results_8b"),
 }
+
+# The 1B preset is retained only for reading historical test artifacts.
+ACTIVE_MODELS = ("7b", "8b")

@@ -1,30 +1,15 @@
-# Results
+# Result status
 
-The tables and figures summarize the recorded outputs. Attack success rate (ASR)
-is the percentage of completions with a HarmBench judge score above 0.5.
-Lower attack success at a shallow exit should be read alongside its task performance.
+The current study evaluates GCG on Balcony-LLaMA2-7B and Balcony-LLaMA3-8B.
+TAO is planned, and the 1B runs were development tests.
 
-## GCG attack success
+The tracked figures, tables, and raw outputs are historical artifacts. They do
+not consistently match the current analysis and should not be cited as final
+study results. Regenerating an old plot does not validate its inputs.
 
-| Model | Exits, shallow to full | HarmBench ASR (%) | AdvBench ASR (%) |
-| --- | --- | --- | --- |
-| Balcony 1B | 4, 8, 12, full | 26, 18, 72, 58 | 26, 32, 62, 68 |
-| LLaMA 2 7B | 15, 18, 21, full | 24, 28, 26, 38 | 30, 36, 34, 34 |
-| LLaMA 3 8B | 15, 18, 21, full | 4, 12, 12, 28 | 2, 0, 12, 28 |
+Current figure publication is pending reconciliation of the run variants,
+judge settings, and exit labels. In particular, the 7B runs with and without
+chat templates must remain separate.
 
-Loss, TAO results, and separate baseline arms are in the
-[full table](paper_tables/results_table.md). Figures are in the [README](README.md#figures).
-
-## Data notes
-
-- `results/`, `results_7b/`, and `results_8b/` are the sources for the figures above.
-- `results_7b_notemplate/` contains the separate, corrected template-free GCG reruns, split by exit.
-- `*_512.json` contains regenerated completions. Keep these separate from the original completions and their judge scores.
-- `results_*_tao500/` contains partial TAO shards with a different attack budget. These are not complete benchmark runs.
-- Archived judge files do not consistently record classifier and generation settings. Avoid mixing score variants.
-
-TAO reports a two-stage objective, which can be negative. Its final loss is not
-directly comparable with GCG cross-entropy.
-
-Rebuild the tables with `.venv/bin/python scripts/run.py export`.
-Rebuild the figures with `.venv/bin/python scripts/run.py figures`.
+TAO checkpoints and partial shards are experimental outputs, not validated
+benchmark results. The old 1B artifacts remain only for development provenance.

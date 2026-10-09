@@ -1,63 +1,46 @@
 # Jailbreaks across model depth
 
 How does early exit change a language model's vulnerability to jailbreaks?
-We test GCG and TAO attacks at different depths of Balcony models, then measure
-attack success, transfer between exits, and performance on ordinary tasks.
+We study GCG attacks on Balcony-LLaMA2-7B and Balcony-LLaMA3-8B at layers
+15, 18, 21, and full depth, using HarmBench and AdvBench.
 
-The recorded experiments cover 1B, LLaMA 2 7B, and LLaMA 3 8B checkpoints on
-HarmBench and AdvBench. [Results and data notes](RESULTS.md).
-
-## Figures
-
-Attack success across exits and models:
-
-![GCG attack success rates on HarmBench and AdvBench](paper_figures/01_asr_bar.png)
-
-Performance on ordinary tasks, before and after adding an attack suffix:
-
-![Clean and attacked utility across model depths](paper_figures/04_utility_clean_vs_attacked.png)
-
-<details>
-<summary>Loss curves and other comparisons</summary>
-
-![GCG loss curves on HarmBench](paper_figures/02_loss_curves_harmbench.png)
-![GCG loss curves on AdvBench](paper_figures/03_loss_curves_advbench.png)
-![Final loss against attack success rate](paper_figures/05_loss_vs_asr.png)
-![HarmBench and AdvBench attack success rates](paper_figures/06_harmbench_vs_advbench.png)
-
-</details>
-
-These figures use the archived result sets. The 7B template-free reruns are a
-separate variant; see the [data notes](RESULTS.md).
+TAO is a planned extension. Its implementation is experimental; we do not report
+validated TAO results. The earlier 1B runs were development tests and are outside
+the current study.
 
 ## Run
 
-For GPU experiments, follow [setup](SETUP.md), then start with a small run:
+Follow [setup](SETUP.md), then start with a small GCG run:
 
 ```bash
 .venv/bin/python scripts/run.py experiment --model 7b --stage gcg \
   --benchmarks harmbench --n-behaviors 2 --num-steps 5 --results-dir runs/pilot
 ```
 
-Run the complete experiment suite for one model:
+The default pipeline runs GCG, judging, and utility evaluation for one model:
 
 ```bash
 .venv/bin/python scripts/run.py experiment --model 7b
 ```
 
-New outputs go to `runs/<model>/`. Add `--dry-run` to inspect commands or
-`--help` to see the available stages. [Command reference](scripts/README.md).
+New outputs go to `runs/<model>/`. Use `--dry-run` to inspect commands.
+[Command reference](scripts/README.md).
 
-## Code and data
+## Results
+
+The old figures have been removed from this README while the current plots and
+their data sources are reconciled. [Result status](RESULTS.md).
+
+## Repository
 
 | Path | Contents |
 | --- | --- |
 | `adapter/` | Early-exit model code and wrappers |
 | `experiments/` | Attack, evaluation, and analysis implementations |
-| `scripts/` | Setup and the shared command line runner |
-| `results*/` | Recorded outputs, including rerun variants |
-| `paper_figures/`, `paper_tables/` | Figures and exported tables |
+| `scripts/` | Setup and the shared runner |
+| `results*/` | Historical run artifacts; not a release of validated study results |
+| `paper_figures/`, `paper_tables/` | Historical exports, superseded by the current analysis |
 
-The three Git submodules pin [AdversariaLLM](https://github.com/LLM-QC/AdversariaLLM),
+The Git submodules pin [AdversariaLLM](https://github.com/LLM-QC/AdversariaLLM),
 [Balcony-LLaMA](https://github.com/benyaminjami/Balcony-LLaMA), and
-[TAO-Attack](https://github.com/ZevineXu/TAO-Attack). Local toolkit fixes are in `patches/`.
+[TAO-Attack](https://github.com/ZevineXu/TAO-Attack). Toolkit fixes are in `patches/`.

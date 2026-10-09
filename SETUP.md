@@ -33,25 +33,26 @@ planned commands and settings.
 
 | Preset | Checkpoint | Exits |
 | --- | --- | --- |
-| `1b` | `parsakaveh/Balcony-LLM-1B` | 4, 8, 12, full |
 | `7b` | `parsakaveh/Balcony-LLaMA2-7B` | 15, 18, 21, full |
 | `8b` | `adpretko/Balcony-Meta-LLaMA3-8B-exit-15-18-21` | 15, 18, 21, full |
 
-Presets live in `experiments/models.py`. Each model uses its matching chat
+The active study uses 7B and 8B. The 1B preset is retained internally for
+historical test artifacts only. Presets live in `experiments/models.py`. Each model uses its matching chat
 template. Use `--plain` for the template-free prompt variant.
 
 The full-depth exit is included in every preset. A separate stock checkpoint is
 optional: select it with `--target baseline --baseline-model <checkpoint>`.
 Use the same prompt template for comparisons between checkpoints.
 
-## Figures only
+## Historical figures only
 
-Plotting the recorded results needs no GPU or model downloads:
+The old plot generator reproduces historical artifacts, not the current paper
+figures. It needs no GPU or model downloads:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install 'numpy>=1.26,<2' 'matplotlib>=3.10,<4'
-.venv/bin/python scripts/run.py figures
+.venv/bin/python scripts/run.py figures --archive
 ```
 
 See the [command reference](scripts/README.md) for individual stages and exports.

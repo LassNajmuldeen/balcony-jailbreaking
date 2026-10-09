@@ -8,19 +8,19 @@ called from another directory.
 
 ```bash
 .venv/bin/python scripts/run.py experiment --model 7b
-.venv/bin/python scripts/run.py experiment --model 8b --stage tao --benchmarks advbench
 .venv/bin/python scripts/run.py experiment --model 7b --stage gcg --plain --results-dir runs/7b-plain
 ```
 
 | Stage | Work |
 | --- | --- |
-| `all` | Clean loss → GCG and TAO on both benchmarks → judge → clean and attacked utility |
-| `gcg`, `tao` | Attack the selected exits and benchmarks |
+| `all` | Clean loss → GCG on both benchmarks → judge → clean and GCG-attacked utility |
+| `gcg` | Attack the selected exits and benchmarks |
+| `tao` | Experimental TAO extension; select explicitly |
 | `control`, `judge` | Measure unattacked loss, or score saved completions |
 | `utility`, `utility-attacked` | Evaluate ordinary tasks, clean or with an attack suffix |
 | `regenerate`, `merge`, `transfer`, `verify-weights` | Replay completions, combine TAO shards, test cross-exit transfer, or compare checkpoint weights |
 
-Choose `--exits 15 full` for a subset. Budgets default to 50 behaviors, 150 steps,
+Active models are `7b` and `8b`. Choose `--exits 15 full` for a subset. Budgets default to 50 behaviors, 150 steps,
 and 512 generated tokens. Use `--n-behaviors`, `--num-steps`, and
 `--max-new-tokens` to change them.
 
@@ -33,16 +33,24 @@ For a separate baseline, pass `--target baseline --baseline-model <checkpoint>`.
 Its default output directory is `runs/<model>-baseline/`.
 Baseline verification also requires `--baseline-model`.
 
-## Figures and exports
+## Experimental TAO
+
+TAO is a planned extension. The code can be exercised explicitly with
+`--stage tao`; existing checkpoints do not establish validated study results.
+For attacked utility with a TAO suffix, use `--stage utility-attacked --attack tao`.
+
+## Historical figures and exports
 
 ```bash
-.venv/bin/python scripts/run.py figures
-.venv/bin/python scripts/run.py export
-.venv/bin/python scripts/run.py export --loss-curves
+.venv/bin/python scripts/run.py figures --archive
+.venv/bin/python scripts/run.py export --archive
+.venv/bin/python scripts/run.py export --archive --loss-curves
 ```
 
+The `--archive` flag is required to avoid presenting these outputs as current.
 Figures go to `paper_figures/`; tables and CSVs go to `paper_tables/`.
-These commands read the archived data, including its original prompt variants.
+These commands reproduce historical artifacts, including the old 1B tests and
+unvalidated TAO outputs. They do not regenerate the current study figures.
 The optional loss-curve export uses the corrected template-free 7B reruns.
 To plot or export a new run, set `RESULTS_DIR_1B`, `RESULTS_DIR_7B`, or
 `RESULTS_DIR_8B` to its output directory. Every exporter uses the same mapping.

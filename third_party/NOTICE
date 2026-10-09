@@ -1,0 +1,14 @@
+Third-party source notices
+
+adapter/balcony_llama/ derives from Balcony-LLaMA and Hugging Face Transformers.
+Its Apache-2.0 license is in adapter/balcony_llama/LICENSE; copyright notices
+remain in the source files.
+
+TAO reference implementation: ZevineXu/TAO-Attack, revision bd4238051e53830cb1429466dea0c3d2f2ece335.
+Its MIT notice is preserved in TAO-Attack-LICENSE.txt.
+
+HarmBench behavior data distributed through AdversariaLLM carries the
+Center for AI Safety MIT notice, preserved in HarmBench-LICENSE.txt.
+
+These notices apply to their respective upstream materials. They do not assign
+a license to this project's original code, generated results, or model weights.

@@ -20,11 +20,11 @@ class RunnerTests(unittest.TestCase):
     def args(self, *extra):
         return runner.parser().parse_args(["experiment", "--model", "7b", *extra])
 
-    def test_full_plan_has_both_attacks_and_benchmarks(self):
+    def test_default_plan_is_gcg_only_on_both_benchmarks(self):
         jobs = runner.plan(self.args())
         self.assertEqual([j[0] for j in jobs], [
-            "control", "gcg-harmbench", "tao-harmbench", "gcg-advbench", "tao-advbench",
-            "judge", "utility", "utility-gcg", "utility-tao",
+            "control", "gcg-harmbench", "gcg-advbench",
+            "judge", "utility", "utility-gcg",
         ])
         self.assertTrue(all(j[3]["BASELINE_MODEL"] == "" for j in jobs))
         self.assertTrue(all(Path(j[3]["RESULTS_DIR"]) == REPO / "runs/7b" for j in jobs))
@@ -49,13 +49,29 @@ class RunnerTests(unittest.TestCase):
                 runner.plan(self.args("--results-dir", name))
 
     def test_model_presets_and_plain_prompt(self):
-        for model, exits in (("1b", "4 8 12 full"), ("7b", "15 18 21 full"), ("8b", "15 18 21 full")):
+        for model, exits in (("7b", "15 18 21 full"), ("8b", "15 18 21 full")):
             args = runner.parser().parse_args(["experiment", "--model", model, "--plain"])
             env = runner.plan(args)[0][3]
             self.assertEqual(env["EXITS"], exits)
             self.assertEqual(env["CHAT_TEMPLATE"], "plain")
         with self.assertRaisesRegex(ValueError, "unique subset"):
             runner.plan(self.args("--exits", "4", "full"))
+
+    def test_1b_is_not_an_active_experiment(self):
+        with self.assertRaises(SystemExit):
+            runner.parser().parse_args(["experiment", "--model", "1b"])
+
+    def test_tao_requires_an_explicit_stage(self):
+        jobs = runner.plan(self.args("--stage", "tao", "--benchmarks", "harmbench"))
+        self.assertEqual([j[0] for j in jobs], ["tao-harmbench"])
+
+    def test_historical_exports_require_explicit_selection(self):
+        for command in ("figures", "export"):
+            args = runner.parser().parse_args([command])
+            with self.assertRaisesRegex(ValueError, "not reconciled"):
+                runner.plan(args)
+            args = runner.parser().parse_args([command, "--archive"])
+            self.assertTrue(runner.plan(args))
 
     def test_attack_completeness_checks(self):
         with tempfile.TemporaryDirectory() as temp:
